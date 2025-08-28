@@ -27,9 +27,12 @@ CREATE TABLE IF NOT EXISTS `bookings` (
   `court_id` INT,
   `customer_name` VARCHAR(255) NOT NULL,
   `customer_contact` VARCHAR(255) NOT NULL,
+  `customer_email` VARCHAR(255),
   `date` DATE NOT NULL,
   `time_slot` VARCHAR(255) NOT NULL,
   `status` VARCHAR(50) DEFAULT 'Booked',
+  `payment_mode` ENUM('cash', 'online'),
+  `amount_paid` DECIMAL(10, 2),
   FOREIGN KEY (`court_id`) REFERENCES `courts`(`id`)
 );
 

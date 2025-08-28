@@ -86,7 +86,7 @@ router.get('/bookings/all', async (req, res) => {
 
 // Add a new booking
 router.post('/bookings', async (req, res) => {
-    const { court_id, customer_name, customer_contact, date, time_slot } = req.body;
+    const { court_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid } = req.body;
 
     // Check for double booking
     try {
@@ -95,7 +95,10 @@ router.post('/bookings', async (req, res) => {
             return res.status(409).json({ message: 'Slot already booked' });
         }
 
-        const [result] = await db.query('INSERT INTO bookings (court_id, customer_name, customer_contact, date, time_slot) VALUES (?, ?, ?, ?, ?)', [court_id, customer_name, customer_contact, date, time_slot]);
+        const sql = 'INSERT INTO bookings (court_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+        const values = [court_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid];
+
+        const [result] = await db.query(sql, values);
         res.json({ success: true, bookingId: result.insertId });
     } catch (err) {
         res.status(500).json({ error: err.message });

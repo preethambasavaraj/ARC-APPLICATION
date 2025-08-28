@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const BookingForm = ({ courts, selectedDate, selectedTime, onBookingSuccess, timeSlots }) => {
+const BookingForm = ({ courts, selectedDate, selectedTime, onBookingSuccess }) => {
     const [courtId, setCourtId] = useState('');
     const [customerName, setCustomerName] = useState('');
     const [customerContact, setCustomerContact] = useState('');
+    const [customerEmail, setCustomerEmail] = useState('');
+    const [paymentMode, setPaymentMode] = useState('cash');
+    const [amountPaid, setAmountPaid] = useState('');
     const [message, setMessage] = useState('');
 
     useEffect(() => {
-        // Reset court selection when available courts change
         setCourtId('');
     }, [courts]);
 
@@ -23,12 +25,19 @@ const BookingForm = ({ courts, selectedDate, selectedTime, onBookingSuccess, tim
                 court_id: courtId,
                 customer_name: customerName,
                 customer_contact: customerContact,
+                customer_email: customerEmail,
                 date: selectedDate,
-                time_slot: selectedTime
+                time_slot: selectedTime,
+                payment_mode: paymentMode,
+                amount_paid: amountPaid
             });
-            setMessage(`Booking successful! Receipt ID: ${res.data.bookingId}. You can print this page.`);
+            setMessage(`Booking successful! Receipt ID: ${res.data.bookingId}.`);
+            // Reset form
             setCustomerName('');
             setCustomerContact('');
+            setCustomerEmail('');
+            setPaymentMode('cash');
+            setAmountPaid('');
             setCourtId('');
             onBookingSuccess();
         } catch (err) {
@@ -56,6 +65,21 @@ const BookingForm = ({ courts, selectedDate, selectedTime, onBookingSuccess, tim
             <div>
                 <label>Customer Contact</label>
                 <input type="text" value={customerContact} onChange={(e) => setCustomerContact(e.target.value)} required />
+            </div>
+            <div>
+                <label>Customer Email (Optional)</label>
+                <input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
+            </div>
+            <div>
+                <label>Payment Mode</label>
+                <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} required>
+                    <option value="cash">Cash</option>
+                    <option value="online">Online</option>
+                </select>
+            </div>
+            <div>
+                <label>Amount Paid</label>
+                <input type="number" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} required />
             </div>
             <button type="submit">Create Booking</button>
         </form>

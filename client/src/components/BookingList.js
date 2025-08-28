@@ -9,7 +9,10 @@ const BookingList = ({ bookings }) => {
                     <th>Court</th>
                     <th>Customer</th>
                     <th>Contact</th>
+                    <th>Email</th>
                     <th>Time Slot</th>
+                    <th>Payment</th>
+                    <th>Amount</th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -20,7 +23,10 @@ const BookingList = ({ bookings }) => {
                         <td>{booking.court_name}</td>
                         <td>{booking.customer_name}</td>
                         <td>{booking.customer_contact}</td>
+                        <td>{booking.customer_email}</td>
                         <td>{booking.time_slot}</td>
+                        <td>{booking.payment_mode}</td>
+                        <td>{booking.amount_paid}</td>
                         <td>{booking.status}</td>
                     </tr>
                 ))}
