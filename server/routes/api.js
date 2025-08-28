@@ -31,7 +31,7 @@ router.get('/sports', async (req, res) => {
 // Get all courts
 router.get('/courts', async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT c.id, c.name, c.status, s.name as sport_name FROM courts c JOIN sports s ON c.sport_id = s.id');
+        const [rows] = await db.query('SELECT c.id, c.name, c.status, s.name as sport_name, s.price FROM courts c JOIN sports s ON c.sport_id = s.id');
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -46,7 +46,7 @@ router.get('/courts/availability', async (req, res) => {
     }
 
     try {
-        const [courts] = await db.query('SELECT c.id, c.name, c.status, s.name as sport_name FROM courts c JOIN sports s ON c.sport_id = s.id');
+        const [courts] = await db.query('SELECT c.id, c.name, c.status, s.name as sport_name, s.price FROM courts c JOIN sports s ON c.sport_id = s.id');
         const [bookings] = await db.query('SELECT court_id FROM bookings WHERE date = ? AND time_slot = ?', [date, time_slot]);
         
         const bookedCourtIds = bookings.map(b => b.court_id);
@@ -119,13 +119,28 @@ router.put('/courts/:id/status', async (req, res) => {
 
 // Add a new sport
 router.post('/sports', async (req, res) => {
-    const { name } = req.body;
-    if (!name) {
-        return res.status(400).json({ message: 'Sport name is required' });
+    const { name, price } = req.body;
+    if (!name || price === undefined) {
+        return res.status(400).json({ message: 'Sport name and price are required' });
     }
     try {
-        const [result] = await db.query('INSERT INTO sports (name) VALUES (?)', [name]);
+        const [result] = await db.query('INSERT INTO sports (name, price) VALUES (?, ?)', [name, price]);
         res.json({ success: true, sportId: result.insertId });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Update sport price
+router.put('/sports/:id', async (req, res) => {
+    const { id } = req.params;
+    const { price } = req.body;
+    if (price === undefined) {
+        return res.status(400).json({ message: 'Price is required' });
+    }
+    try {
+        await db.query('UPDATE sports SET price = ? WHERE id = ?', [price, id]);
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

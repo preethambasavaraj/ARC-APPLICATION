@@ -11,8 +11,22 @@ const BookingForm = ({ courts, selectedDate, selectedTime, onBookingSuccess }) =
     const [message, setMessage] = useState('');
 
     useEffect(() => {
+        // When available courts change, reset the form
         setCourtId('');
+        setAmountPaid('');
     }, [courts]);
+
+    useEffect(() => {
+        // When a court is selected, auto-fill the price
+        if (courtId) {
+            const selectedCourt = courts.find(c => c.id === parseInt(courtId));
+            if (selectedCourt) {
+                setAmountPaid(selectedCourt.price);
+            }
+        } else {
+            setAmountPaid('');
+        }
+    }, [courtId, courts]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -79,7 +93,7 @@ const BookingForm = ({ courts, selectedDate, selectedTime, onBookingSuccess }) =
             </div>
             <div>
                 <label>Amount Paid</label>
-                <input type="number" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} required />
+                <input type="number" value={amountPaid} required placeholder="Select a court to see price" readOnly />
             </div>
             <button type="submit">Create Booking</button>
         </form>

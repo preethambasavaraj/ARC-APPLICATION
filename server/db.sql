@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS `users` (
 
 CREATE TABLE IF NOT EXISTS `sports` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR(255) NOT NULL
+  `name` VARCHAR(255) NOT NULL,
+  `price` DECIMAL(10, 2) NOT NULL DEFAULT 0.00
 );
 
 CREATE TABLE IF NOT EXISTS `courts` (
@@ -40,7 +41,7 @@ CREATE TABLE IF NOT EXISTS `bookings` (
 
 INSERT INTO `users` (username, password) VALUES ('reception', 'password123');
 
-INSERT INTO `sports` (name) VALUES ('Badminton'), ('Turf'), ('Table Tennis'), ('Swimming'), ('Pickleball');
+INSERT INTO `sports` (name, price) VALUES ('Badminton', 300), ('Turf', 1200), ('Table Tennis', 150), ('Swimming', 150), ('Pickleball', 400);
 
 INSERT INTO `courts` (sport_id, name) VALUES 
 (1, 'Badminton Court 1'),
