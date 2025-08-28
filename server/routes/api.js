@@ -160,4 +160,26 @@ router.post('/courts', async (req, res) => {
     }
 });
 
+// Delete a court
+router.delete('/courts/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('DELETE FROM courts WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Delete a sport
+router.delete('/sports/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('DELETE FROM sports WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
