@@ -3,6 +3,7 @@ import axios from 'axios';
 
 const Admin = () => {
     const [sports, setSports] = useState([]);
+    const [courts, setCourts] = useState([]);
     const [newSportName, setNewSportName] = useState('');
     const [newSportPrice, setNewSportPrice] = useState('');
     const [newCourtName, setNewCourtName] = useState('');
@@ -11,11 +12,17 @@ const Admin = () => {
 
     useEffect(() => {
         fetchSports();
+        fetchCourts();
     }, []);
 
     const fetchSports = async () => {
         const res = await axios.get('http://localhost:5000/api/sports');
         setSports(res.data);
+    };
+
+    const fetchCourts = async () => {
+        const res = await axios.get('http://localhost:5000/api/courts');
+        setCourts(res.data);
     };
 
     const handleAddSport = async (e) => {
@@ -27,7 +34,7 @@ const Admin = () => {
             fetchSports();
             setMessage('Sport added successfully!');
         } catch (err) {
-            setMessage('Error adding sport');
+            setMessage(err.response?.data?.message || 'Error adding sport');
         }
     };
 
@@ -37,9 +44,10 @@ const Admin = () => {
             await axios.post('http://localhost:5000/api/courts', { name: newCourtName, sport_id: selectedSportId });
             setNewCourtName('');
             setSelectedSportId('');
+            fetchCourts(); // Refresh court list
             setMessage('Court added successfully!');
         } catch (err) {
-            setMessage('Error adding court');
+            setMessage(err.response?.data?.message || 'Error adding court');
         }
     };
 
@@ -56,7 +64,32 @@ const Admin = () => {
             await axios.put(`http://localhost:5000/api/sports/${sportId}`, { price: sportToUpdate.price });
             setMessage(`Price for ${sportToUpdate.name} updated successfully!`);
         } catch (err) {
-            setMessage('Error updating price');
+            setMessage(err.response?.data?.message || 'Error updating price');
+        }
+    };
+
+    const handleDeleteSport = async (sportId) => {
+        if (window.confirm('Are you sure? Deleting a sport will also delete all of its courts.')) {
+            try {
+                await axios.delete(`http://localhost:5000/api/sports/${sportId}`);
+                fetchSports();
+                fetchCourts();
+                setMessage('Sport deleted successfully!');
+            } catch (err) {
+                setMessage(err.response ? err.response.data.message : err.message || 'Error deleting sport');
+            }
+        }
+    };
+
+    const handleDeleteCourt = async (courtId) => {
+        if (window.confirm('Are you sure you want to delete this court?')) {
+            try {
+                await axios.delete(`http://localhost:5000/api/courts/${courtId}`);
+                fetchCourts();
+                setMessage('Court deleted successfully!');
+            } catch (err) {
+                setMessage(err.response ? err.response.data.message : err.message || 'Error deleting court');
+            }
         }
     };
 
@@ -100,30 +133,54 @@ const Admin = () => {
                 </div>
             </div>
 
-            <div>
-                <h3>Edit Sport Prices</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Sport</th>
-                            <th>Price</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sports.map(sport => (
-                            <tr key={sport.id}>
-                                <td>{sport.name}</td>
-                                <td>
-                                    <input type="number" value={sport.price} onChange={(e) => handlePriceChange(e, sport.id)} />
-                                </td>
-                                <td>
-                                    <button onClick={() => handleUpdatePrice(sport.id)}>Update</button>
-                                </td>
+            <div style={{ display: 'flex', gap: '40px' }}>
+                <div style={{ flex: 1 }}>
+                    <h3>Manage Sports</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Sport</th>
+                                <th>Price</th>
+                                <th>Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {sports.map(sport => (
+                                <tr key={sport.id}>
+                                    <td>{sport.name}</td>
+                                    <td><input type="number" value={sport.price} onChange={(e) => handlePriceChange(e, sport.id)} /></td>
+                                    <td>
+                                        <button onClick={() => handleUpdatePrice(sport.id)}>Update Price</button>
+                                        <button onClick={() => handleDeleteSport(sport.id)}>Delete</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                <div style={{ flex: 1 }}>
+                    <h3>Manage Courts</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Court</th>
+                                <th>Sport</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {courts.map(court => (
+                                <tr key={court.id}>
+                                    <td>{court.name}</td>
+                                    <td>{court.sport_name}</td>
+                                    <td>
+                                        <button onClick={() => handleDeleteCourt(court.id)}>Delete</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
