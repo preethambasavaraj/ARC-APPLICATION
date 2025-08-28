@@ -59,7 +59,7 @@ const Dashboard = () => {
             <div>
                 <h3>Check Availability & Book</h3>
                 <label>Date: </label>
-                <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+                <input type="date" value={selectedDate} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setSelectedDate(e.target.value)} />
                 <label>Time: </label>
                 <select value={selectedTime} onChange={(e) => setSelectedTime(e.target.value)}>
                     {timeSlots.map(slot => <option key={slot} value={slot}>{slot}</option>)}
