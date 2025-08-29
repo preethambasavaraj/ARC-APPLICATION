@@ -16,3 +16,4 @@ yarn-error.log*
 
 # Other
 .DS_Store
+.env
