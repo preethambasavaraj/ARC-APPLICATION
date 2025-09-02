@@ -131,14 +131,28 @@ Runs on **[http://localhost:3000](http://localhost:3000)**.
 
 ## 🔗 API Endpoints
 
-The backend exposes these APIs (check `server/routes/api.js` for exact details):
+The backend exposes these APIs, all prefixed with `/api`. See `server/routes/api.js` for full details.
 
-* `POST /api/login` → Authenticate user
-* `GET /api/dashboard` → Fetch dashboard data
-* `GET /api/bookings` → List user bookings
-* `POST /api/bookings` → Create new booking
-* `GET /api/ledger` → Get ledger/transaction history
-* `GET /api/admin/data` → Fetch admin panel data
+### Auth
+*   `POST /login` → Authenticate a user.
+
+### Sports Management
+*   `GET /sports` → Get a list of all sports.
+*   `POST /sports` → Add a new sport.
+*   `PUT /sports/:id` → Update a sport's price.
+*   `DELETE /sports/:id` → Delete a sport.
+
+### Court Management
+*   `GET /courts` → Get a list of all courts and their status.
+*   `POST /courts` → Add a new court.
+*   `PUT /courts/:id/status` → Update a court's status (e.g., "Under Maintenance").
+*   `DELETE /courts/:id` → Delete a court.
+
+### Booking Management
+*   `GET /courts/availability` → Check available courts for a given date/time.
+*   `GET /bookings` → Get bookings for a specific date.
+*   `POST /bookings` → Create a new booking.
+*   `GET /bookings/all` → Get a complete list of all bookings (for the ledger).
 
 ---
 
