@@ -86,7 +86,7 @@ DB_DATABASE=your_database_name
 npm start
 ```
 
-Runs typically on **[http://localhost:3001](http://localhost:3001)** (check `server.js`).
+Runs on **[http://localhost:5000](http://localhost:5000)** by default (check `server.js`).
 
 ---
 
