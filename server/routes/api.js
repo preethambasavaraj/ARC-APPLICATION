@@ -40,21 +40,55 @@ router.get('/courts', async (req, res) => {
 
 // Get court availability for a specific date and time
 router.get('/courts/availability', async (req, res) => {
-    const { date, time_slot } = req.query;
-    if (!date || !time_slot) {
-        return res.status(400).json({ message: 'Date and time slot are required' });
+    const { date, startTime, endTime } = req.query;
+    if (!date || !startTime || !endTime) {
+        return res.status(400).json({ 
+            message: 'SERVER CODE IS UPDATED. Params are still missing.',
+            received_query: req.query
+        });
     }
 
     try {
         const [courts] = await db.query('SELECT c.id, c.name, c.status, s.name as sport_name, s.price FROM courts c JOIN sports s ON c.sport_id = s.id');
-        const [bookings] = await db.query('SELECT court_id FROM bookings WHERE date = ? AND time_slot = ?', [date, time_slot]);
-        
-        const bookedCourtIds = bookings.map(b => b.court_id);
+        const [bookings] = await db.query('SELECT court_id, time_slot FROM bookings WHERE date = ?', [date]);
 
-        const availability = courts.map(court => ({
-            ...court,
-            is_available: !bookedCourtIds.includes(court.id) && court.status !== 'Under Maintenance'
-        }));
+        const toMinutes = (timeStr) => {
+            const [time, modifier] = timeStr.split(' ');
+            let [hours, minutes] = time.split(':').map(Number);
+
+            if (modifier === 'PM' && hours < 12) {
+                hours += 12;
+            }
+            if (modifier === 'AM' && hours === 12) { // Handle midnight case
+                hours = 0;
+            }
+            // If there's no modifier, it's already 24-hour format
+            return hours * 60 + minutes;
+        };
+
+        const checkOverlap = (startA, endA, startB, endB) => {
+            const startAMin = toMinutes(startA);
+            const endAMin = toMinutes(endA);
+            const startBMin = toMinutes(startB);
+            const endBMin = toMinutes(endB);
+
+            return startAMin < endBMin && endAMin > startBMin;
+        };
+
+        const availability = courts.map(court => {
+            if (court.status === 'Under Maintenance') {
+                return { ...court, is_available: false };
+            }
+
+            const courtBookings = bookings.filter(b => b.court_id === court.id);
+
+            const isOverlapping = courtBookings.some(booking => {
+                const [existingStart, existingEnd] = booking.time_slot.split(' - ');
+                return checkOverlap(startTime, endTime, existingStart.trim(), existingEnd.trim());
+            });
+
+            return { ...court, is_available: !isOverlapping };
+        });
 
         res.json(availability);
     } catch (err) {
@@ -106,34 +140,49 @@ router.get('/bookings/all', async (req, res) => {
 
 // Add a new booking
 router.post('/bookings', async (req, res) => {
-    console.log('--- New Booking Request ---');
-    console.log('Received body:', req.body);
-
-    const { court_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid } = req.body;
+    const { court_id, created_by_user_id, customer_name, customer_contact, customer_email, date, startTime, endTime, payment_mode, amount_paid } = req.body;
 
     try {
-        // First, get the sport_id from the court
         const [courts] = await db.query('SELECT sport_id FROM courts WHERE id = ?', [court_id]);
         if (courts.length === 0) {
             return res.status(404).json({ message: 'Court not found' });
         }
         const sport_id = courts[0].sport_id;
-        console.log('Found sport_id:', sport_id);
 
-        // Check for double booking
-        const [existing] = await db.query('SELECT * FROM bookings WHERE court_id = ? AND date = ? AND time_slot = ?', [court_id, date, time_slot]);
-        if (existing.length > 0) {
-            return res.status(409).json({ message: 'Slot already booked' });
+        const [existingBookings] = await db.query('SELECT time_slot FROM bookings WHERE court_id = ? AND date = ?', [court_id, date]);
+        
+        const toMinutes = (timeStr) => {
+            const [time, modifier] = timeStr.split(' ');
+            let [hours, minutes] = time.split(':').map(Number);
+            if (modifier === 'PM' && hours < 12) hours += 12;
+            if (modifier === 'AM' && hours === 12) hours = 0;
+            return hours * 60 + minutes;
+        };
+
+        const checkOverlap = (startA, endA, startB, endB) => {
+            const startAMin = toMinutes(startA);
+            const endAMin = toMinutes(endA);
+            const startBMin = toMinutes(startB);
+            const endBMin = toMinutes(endB);
+            return startAMin < endBMin && endAMin > startBMin;
+        };
+
+        const isOverlapping = existingBookings.some(booking => {
+            const [existingStart, existingEnd] = booking.time_slot.split(' - ');
+            return checkOverlap(startTime, endTime, existingStart.trim(), existingEnd.trim());
+        });
+
+        if (isOverlapping) {
+            return res.status(409).json({ message: 'The selected time slot is unavailable.' });
         }
 
+        const time_slot = `${startTime} - ${endTime}`;
         const sql = 'INSERT INTO bookings (court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
         const values = [court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid];
-        console.log('Values for INSERT:', values);
 
         const [result] = await db.query(sql, values);
         res.json({ success: true, bookingId: result.insertId });
     } catch (err) {
-        console.error('Error creating booking:', err);
         res.status(500).json({ error: err.message });
     }
 });

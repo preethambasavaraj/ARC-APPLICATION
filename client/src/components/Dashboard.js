@@ -3,29 +3,30 @@ import axios from 'axios';
 import BookingForm from './BookingForm';
 import BookingList from './BookingList';
 
-const timeSlots = [
-    "09:00 AM - 10:00 AM", "10:00 AM - 11:00 AM", "11:00 AM - 12:00 PM",
-    "12:00 PM - 01:00 PM", "01:00 PM - 02:00 PM", "02:00 PM - 03:00 PM",
-    "03:00 PM - 04:00 PM", "04:00 PM - 05:00 PM", "05:00 PM - 06:00 PM",
-    "06:00 PM - 07:00 PM", "07:00 PM - 08:00 PM", "08:00 PM - 09:00 PM"
-];
-
 const Dashboard = ({ user }) => {
     const [bookings, setBookings] = useState([]);
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
-    const [selectedTime, setSelectedTime] = useState(timeSlots[0]);
+    const [startTime, setStartTime] = useState('09:00');
+    const [endTime, setEndTime] = useState('10:00');
     const [availability, setAvailability] = useState([]);
 
     const fetchAvailability = useCallback(async () => {
-        if (selectedDate && selectedTime) {
+        if (selectedDate && startTime && endTime) {
             try {
-                const res = await axios.get(`http://localhost:5000/api/courts/availability`, { params: { date: selectedDate, time_slot: selectedTime } });
+                console.log('Fetching availability with params:', { date: selectedDate, startTime: startTime, endTime: endTime });
+                const res = await axios.get(`http://localhost:5000/api/courts/availability`, { 
+                    params: { 
+                        date: selectedDate, 
+                        startTime: startTime, 
+                        endTime: endTime 
+                    } 
+                });
                 setAvailability(res.data);
             } catch (error) {
                 console.error("Error fetching availability:", error);
             }
         }
-    }, [selectedDate, selectedTime]);
+    }, [selectedDate, startTime, endTime]);
 
     const fetchBookingsForDate = useCallback(async () => {
         const res = await axios.get(`http://localhost:5000/api/bookings?date=${selectedDate}`);
@@ -60,10 +61,10 @@ const Dashboard = ({ user }) => {
                 <h3>Check Availability & Book</h3>
                 <label>Date: </label>
                 <input type="date" value={selectedDate} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setSelectedDate(e.target.value)} />
-                <label>Time: </label>
-                <select value={selectedTime} onChange={(e) => setSelectedTime(e.target.value)}>
-                    {timeSlots.map(slot => <option key={slot} value={slot}>{slot}</option>)}
-                </select>
+                <label>Start Time: </label>
+                <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                <label>End Time: </label>
+                <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
             </div>
 
             <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
@@ -95,9 +96,9 @@ const Dashboard = ({ user }) => {
                      <BookingForm
                         courts={availability.filter(c => c.is_available)}
                         selectedDate={selectedDate}
-                        selectedTime={selectedTime}
+                        startTime={startTime}
+                        endTime={endTime}
                         onBookingSuccess={handleBookingSuccess}
-                        timeSlots={timeSlots}
                         user={user}
                     />
                 </div>

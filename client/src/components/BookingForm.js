@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const BookingForm = ({ courts, selectedDate, selectedTime, onBookingSuccess, user }) => {
+const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSuccess, user }) => {
     const [courtId, setCourtId] = useState('');
     const [customerName, setCustomerName] = useState('');
     const [customerContact, setCustomerContact] = useState('');
@@ -35,6 +35,7 @@ const BookingForm = ({ courts, selectedDate, selectedTime, onBookingSuccess, use
             return;
         }
         try {
+            const time_slot = `${startTime} - ${endTime}`;
             const res = await axios.post('http://localhost:5000/api/bookings', {
                 court_id: courtId,
                 created_by_user_id: user.id,
@@ -42,7 +43,7 @@ const BookingForm = ({ courts, selectedDate, selectedTime, onBookingSuccess, use
                 customer_contact: customerContact,
                 customer_email: customerEmail,
                 date: selectedDate,
-                time_slot: selectedTime,
+                time_slot: time_slot,
                 payment_mode: paymentMode,
                 amount_paid: amountPaid
             });
@@ -63,7 +64,7 @@ const BookingForm = ({ courts, selectedDate, selectedTime, onBookingSuccess, use
     return (
         <form onSubmit={handleSubmit}>
             {message && <p>{message}</p>}
-            <p>Booking for: <strong>{selectedDate}</strong> at <strong>{selectedTime}</strong></p>
+            <p>Booking for: <strong>{selectedDate}</strong> from <strong>{startTime}</strong> to <strong>{endTime}</strong></p>
             <div>
                 <label>Court</label>
                 <select value={courtId} onChange={(e) => setCourtId(e.target.value)} required>
