@@ -10,7 +10,7 @@ const timeSlots = [
     "06:00 PM - 07:00 PM", "07:00 PM - 08:00 PM", "08:00 PM - 09:00 PM"
 ];
 
-const Dashboard = () => {
+const Dashboard = ({ user }) => {
     const [bookings, setBookings] = useState([]);
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
     const [selectedTime, setSelectedTime] = useState(timeSlots[0]);
@@ -98,6 +98,7 @@ const Dashboard = () => {
                         selectedTime={selectedTime}
                         onBookingSuccess={handleBookingSuccess}
                         timeSlots={timeSlots}
+                        user={user}
                     />
                 </div>
             </div>

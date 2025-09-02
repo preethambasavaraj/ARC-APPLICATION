@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS `bookings` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `court_id` INT,
   `sport_id` INT,
+  `created_by_user_id` INT,
   `customer_name` VARCHAR(255) NOT NULL,
   `customer_contact` VARCHAR(255) NOT NULL,
   `customer_email` VARCHAR(255),
@@ -35,7 +36,8 @@ CREATE TABLE IF NOT EXISTS `bookings` (
   `status` VARCHAR(50) DEFAULT 'Booked',
   `payment_mode` ENUM('cash', 'online'),
   `amount_paid` DECIMAL(10, 2),
-    FOREIGN KEY (`sport_id`) REFERENCES `sports`(`id`) ON DELETE CASCADE
+    FOREIGN KEY (`sport_id`) REFERENCES `sports`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`created_by_user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
 );
 
 -- Insert some sample data
@@ -52,4 +54,6 @@ INSERT INTO `courts` (sport_id, name) VALUES
 (4, 'Swimming Lane 1'),
 (5, 'Pickleball Court 1');
 
+select * from bookings;
 
+ DELETE FROM bookings WHERE id = 1;

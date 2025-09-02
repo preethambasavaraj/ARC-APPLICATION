@@ -66,7 +66,17 @@ router.get('/courts/availability', async (req, res) => {
 router.get('/bookings', async (req, res) => {
     const { date } = req.query;
     try {
-        const [rows] = await db.query('SELECT b.*, c.name as court_name FROM bookings b JOIN courts c ON b.court_id = c.id WHERE b.date = ?', [date]);
+        const query = `
+            SELECT 
+                b.*, 
+                c.name as court_name, 
+                u.username as created_by_user 
+            FROM bookings b 
+            JOIN courts c ON b.court_id = c.id
+            LEFT JOIN users u ON b.created_by_user_id = u.id
+            WHERE b.date = ?
+        `;
+        const [rows] = await db.query(query, [date]);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -76,7 +86,17 @@ router.get('/bookings', async (req, res) => {
 // Get all bookings (ledger)
 router.get('/bookings/all', async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT b.*, c.name as court_name FROM bookings b JOIN courts c ON b.court_id = c.id ORDER BY b.date DESC');
+        const query = `
+            SELECT 
+                b.*, 
+                c.name as court_name, 
+                u.username as created_by_user 
+            FROM bookings b 
+            JOIN courts c ON b.court_id = c.id
+            LEFT JOIN users u ON b.created_by_user_id = u.id
+            ORDER BY b.date DESC
+        `;
+        const [rows] = await db.query(query);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -86,21 +106,34 @@ router.get('/bookings/all', async (req, res) => {
 
 // Add a new booking
 router.post('/bookings', async (req, res) => {
-    const { court_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid } = req.body;
+    console.log('--- New Booking Request ---');
+    console.log('Received body:', req.body);
 
-    // Check for double booking
+    const { court_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid } = req.body;
+
     try {
+        // First, get the sport_id from the court
+        const [courts] = await db.query('SELECT sport_id FROM courts WHERE id = ?', [court_id]);
+        if (courts.length === 0) {
+            return res.status(404).json({ message: 'Court not found' });
+        }
+        const sport_id = courts[0].sport_id;
+        console.log('Found sport_id:', sport_id);
+
+        // Check for double booking
         const [existing] = await db.query('SELECT * FROM bookings WHERE court_id = ? AND date = ? AND time_slot = ?', [court_id, date, time_slot]);
         if (existing.length > 0) {
             return res.status(409).json({ message: 'Slot already booked' });
         }
 
-        const sql = 'INSERT INTO bookings (court_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-        const values = [court_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid];
+        const sql = 'INSERT INTO bookings (court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+        const values = [court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid];
+        console.log('Values for INSERT:', values);
 
         const [result] = await db.query(sql, values);
         res.json({ success: true, bookingId: result.insertId });
     } catch (err) {
+        console.error('Error creating booking:', err);
         res.status(500).json({ error: err.message });
     }
 });

@@ -34,9 +34,9 @@ function App() {
                 <main>
                     <Routes>
                         <Route path="/login" element={user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />} />
-                        <Route path="/" element={user ? <Dashboard /> : <Navigate to="/login" />} />
-                        <Route path="/ledger" element={user ? <Ledger /> : <Navigate to="/login" />} />
-                        <Route path="/admin" element={user ? <Admin /> : <Navigate to="/login" />} />
+                        <Route path="/" element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} />
+                        <Route path="/ledger" element={user ? <Ledger user={user} /> : <Navigate to="/login" />} />
+                        <Route path="/admin" element={user ? <Admin user={user} /> : <Navigate to="/login" />} />
                     </Routes>
                 </main>
             </div>

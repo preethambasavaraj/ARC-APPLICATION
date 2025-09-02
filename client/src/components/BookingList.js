@@ -8,6 +8,7 @@ const BookingList = ({ bookings }) => {
                     <th>Booking ID</th>
                     <th>Court</th>
                     <th>Customer</th>
+                    <th>Booked-By</th>
                     <th>Contact</th>
                     <th>Email</th>
                     <th>Time Slot</th>
@@ -22,6 +23,7 @@ const BookingList = ({ bookings }) => {
                         <td>{booking.id}</td>
                         <td>{booking.court_name}</td>
                         <td>{booking.customer_name}</td>
+                        <td>{booking.created_by_user || 'N/A'}</td>
                         <td>{booking.customer_contact}</td>
                         <td>{booking.customer_email}</td>
                         <td>{booking.time_slot}</td>
