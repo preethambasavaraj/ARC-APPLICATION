@@ -13,7 +13,6 @@ const Dashboard = ({ user }) => {
     const fetchAvailability = useCallback(async () => {
         if (selectedDate && startTime && endTime) {
             try {
-                console.log('Fetching availability with params:', { date: selectedDate, startTime: startTime, endTime: endTime });
                 const res = await axios.get(`http://localhost:5000/api/courts/availability`, { 
                     params: { 
                         date: selectedDate, 
@@ -39,9 +38,7 @@ const Dashboard = ({ user }) => {
             fetchBookingsForDate();
         };
 
-        fetchData(); // Initial fetch
-
-        // Refetch when the window gets focus
+        fetchData();
         window.addEventListener('focus', fetchData);
         return () => {
             window.removeEventListener('focus', fetchData);
@@ -53,6 +50,20 @@ const Dashboard = ({ user }) => {
         fetchBookingsForDate();
     }
 
+    const handleTimeSlotClick = (start, end) => {
+        setStartTime(start);
+        setEndTime(end);
+    }
+
+    const timeSlots = Array.from({ length: 16 }, (_, i) => {
+        const startHour = 6 + i;
+        const endHour = startHour + 1;
+        const startTimeValue = `${String(startHour).padStart(2, '0')}:00`;
+        const endTimeValue = `${String(endHour).padStart(2, '0')}:00`;
+        const timeLabel = `${startHour % 12 === 0 ? 12 : startHour % 12}:00 ${startHour < 12 ? 'AM' : 'PM'}`;
+        return { start: startTimeValue, end: endTimeValue, label: timeLabel };
+    });
+
     return (
         <div>
             <h2>Dashboard</h2>
@@ -61,10 +72,24 @@ const Dashboard = ({ user }) => {
                 <h3>Check Availability & Book</h3>
                 <label>Date: </label>
                 <input type="date" value={selectedDate} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setSelectedDate(e.target.value)} />
-                <label>Start Time: </label>
-                <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-                <label>End Time: </label>
-                <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                
+                <div>
+                    <label>Time Slots: </label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '10px' }}>
+                        {timeSlots.map(slot => (
+                            <button key={slot.start} onClick={() => handleTimeSlotClick(slot.start, slot.end)}>
+                                {slot.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div style={{ marginTop: '10px' }}>
+                    <label>Start Time: </label>
+                    <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                    <label>End Time: </label>
+                    <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                </div>
             </div>
 
             <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
