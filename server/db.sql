@@ -55,5 +55,6 @@ INSERT INTO `courts` (sport_id, name) VALUES
 (5, 'Pickleball Court 1');
 
 select * from bookings;
+select * from courts;
 
  DELETE FROM bookings WHERE id = 1;
