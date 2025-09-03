@@ -50,7 +50,8 @@ const Dashboard = ({ user }) => {
         fetchBookingsForDate();
     }
 
-    const handleTimeSlotClick = (start, end) => {
+    const handleTimeSlotChange = (event) => {
+        const [start, end] = event.target.value.split('-');
         setStartTime(start);
         setEndTime(end);
     }
@@ -60,8 +61,8 @@ const Dashboard = ({ user }) => {
         const endHour = startHour + 1;
         const startTimeValue = `${String(startHour).padStart(2, '0')}:00`;
         const endTimeValue = `${String(endHour).padStart(2, '0')}:00`;
-        const timeLabel = `${startHour % 12 === 0 ? 12 : startHour % 12}:00 ${startHour < 12 ? 'AM' : 'PM'}`;
-        return { start: startTimeValue, end: endTimeValue, label: timeLabel };
+        const timeLabel = `${startHour % 12 === 0 ? 12 : startHour % 12}:00 ${startHour < 12 ? 'AM' : 'PM'} - ${endHour % 12 === 0 ? 12 : endHour % 12}:00 ${endHour < 12 ? 'AM' : 'PM'}`;
+        return { value: `${startTimeValue}-${endTimeValue}`, label: timeLabel };
     });
 
     return (
@@ -74,14 +75,14 @@ const Dashboard = ({ user }) => {
                 <input type="date" value={selectedDate} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setSelectedDate(e.target.value)} />
                 
                 <div>
-                    <label>Time Slots: </label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '10px' }}>
+                    <label>Time Slot: </label>
+                    <select onChange={handleTimeSlotChange} value={`${startTime}-${endTime}`}>
                         {timeSlots.map(slot => (
-                            <button key={slot.start} onClick={() => handleTimeSlotClick(slot.start, slot.end)}>
+                            <option key={slot.value} value={slot.value}>
                                 {slot.label}
-                            </button>
+                            </option>
                         ))}
-                    </div>
+                    </select>
                 </div>
 
                 <div style={{ marginTop: '10px' }}>
