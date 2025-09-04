@@ -2,6 +2,13 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
+const twilio = require('twilio');
+
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const client = new twilio(accountSid, authToken);
+
+const userSessions = {};
 
 // Login
 router.post('/login', async (req, res) => {
@@ -42,7 +49,7 @@ router.get('/courts', async (req, res) => {
 router.get('/courts/availability', async (req, res) => {
     const { date, startTime, endTime } = req.query;
     if (!date || !startTime || !endTime) {
-        return res.status(400).json({ 
+        return res.status(400).json({
             message: 'SERVER CODE IS UPDATED. Params are still missing.',
             received_query: req.query
         });
@@ -296,6 +303,85 @@ router.delete('/sports/:id', async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+router.post('/whatsapp', async (req, res) => {
+    const twiml = new twilio.twiml.MessagingResponse();
+    const userMessage = req.body.Body.toLowerCase();
+    const from = req.body.From;
+
+    let session = userSessions[from];
+
+    if (!session) {
+        session = { step: 'welcome' };
+        userSessions[from] = session;
+    }
+
+    if (userMessage === 'hi') {
+        session.step = 'welcome';
+    }
+
+    switch (session.step) {
+        case 'welcome':
+            const [sports] = await db.query('SELECT * FROM sports');
+            let sportList = sports.map(s => s.name).join('\n');
+            twiml.message(`Welcome to SportsZone Booking!\n\nPlease select a sport:\n${sportList}`);
+            session.step = 'select_sport';
+            break;
+
+        case 'select_sport':
+            const [selectedSport] = await db.query('SELECT * FROM sports WHERE name = ?', [userMessage]);
+            if (selectedSport.length > 0) {
+                session.sport_id = selectedSport[0].id;
+                twiml.message('Please enter the date for your booking (YYYY-MM-DD).');
+                session.step = 'select_date';
+            } else {
+                twiml.message('Invalid sport. Please select a sport from the list.');
+            }
+            break;
+
+        case 'select_date':
+            session.date = userMessage;
+            twiml.message('Please enter the start time for your booking (e.g., 10:00).');
+            session.step = 'select_time';
+            break;
+
+        case 'select_time':
+            session.startTime = userMessage;
+            session.endTime = `${parseInt(userMessage.split(':')[0]) + 1}:00`; // Assume 1 hour booking
+
+            const [availableCourts] = await db.query('SELECT c.id, c.name FROM courts c LEFT JOIN bookings b ON c.id = b.court_id AND b.date = ? AND b.time_slot = ? WHERE c.sport_id = ? AND b.id IS NULL', [session.date, `${session.startTime} - ${session.endTime}`, session.sport_id]);
+
+            if (availableCourts.length > 0) {
+                session.court_id = availableCourts[0].id;
+                twiml.message('Court available! Please enter your name.');
+                session.step = 'enter_name';
+            } else {
+                twiml.message('Sorry, no courts available at that time. Please try another time.');
+                session.step = 'select_time';
+            }
+            break;
+
+        case 'enter_name':
+            session.customer_name = userMessage;
+            twiml.message('Please enter your phone number.');
+            session.step = 'enter_phone';
+            break;
+
+        case 'enter_phone':
+            session.customer_contact = userMessage;
+            const time_slot = `${session.startTime} - ${session.endTime}`;
+            const sql = 'INSERT INTO bookings (court_id, sport_id, customer_name, customer_contact, date, time_slot, payment_mode, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+            const values = [session.court_id, session.sport_id, session.customer_name, session.customer_contact, session.date, time_slot, 'online', 0];
+            await db.query(sql, values);
+
+            twiml.message('Thank you! Your booking has been confirmed.');
+            delete userSessions[from]; // End session
+            break;
+    }
+
+    res.writeHead(200, { 'Content-Type': 'text/xml' });
+    res.end(twiml.toString());
 });
 
 module.exports = router;
