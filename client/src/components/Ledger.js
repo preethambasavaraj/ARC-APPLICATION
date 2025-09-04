@@ -4,26 +4,18 @@ import BookingList from './BookingList';
 
 const Ledger = () => {
     const [bookings, setBookings] = useState([]);
-    const [filteredBookings, setFilteredBookings] = useState([]);
     const [filters, setFilters] = useState({ date: '', sport: '', customer: '' });
 
     useEffect(() => {
-        const fetchAllBookings = async () => {
-            const res = await axios.get('http://localhost:5000/api/bookings/all');
+        const fetchFilteredBookings = async () => {
+            const { date, sport, customer } = filters;
+            const res = await axios.get('http://localhost:5000/api/bookings/all', {
+                params: { date, sport, customer }
+            });
             setBookings(res.data);
-            setFilteredBookings(res.data);
         };
-        fetchAllBookings();
-    }, []);
-
-    useEffect(() => {
-        let filtered = bookings;
-        if (filters.date) {
-            filtered = filtered.filter(b => b.date.startsWith(filters.date));
-        }
-        // Add more filtering logic for sport and customer if needed
-        setFilteredBookings(filtered);
-    }, [filters, bookings]);
+        fetchFilteredBookings();
+    }, [filters]);
 
     const handleFilterChange = (e) => {
         setFilters({ ...filters, [e.target.name]: e.target.value });
@@ -34,9 +26,10 @@ const Ledger = () => {
             <h2>Booking Ledger</h2>
             <div>
                 <input type="date" name="date" value={filters.date} onChange={handleFilterChange} />
-                 {/* Add more filters for sport and customer here */}
+                <input type="text" name="sport" placeholder="Filter by sport" value={filters.sport} onChange={handleFilterChange} />
+                <input type="text" name="customer" placeholder="Filter by customer" value={filters.customer} onChange={handleFilterChange} />
             </div>
-            <BookingList bookings={filteredBookings} />
+            <BookingList bookings={bookings} />
         </div>
     );
 };

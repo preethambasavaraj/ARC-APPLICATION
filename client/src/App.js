@@ -7,6 +7,18 @@ import Ledger from './components/Ledger';
 import Admin from './components/Admin';
 import './App.css';
 
+const ProtectedRoute = ({ user, allowedRoles, children }) => {
+    if (!user) {
+        return <Navigate to="/login" />;
+    }
+
+    if (!allowedRoles.includes(user.role)) {
+        return <Navigate to="/" />;
+    }
+
+    return children;
+};
+
 function App() {
     const [user, setUser] = useState(null);
 
@@ -34,9 +46,21 @@ function App() {
                 <main>
                     <Routes>
                         <Route path="/login" element={user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />} />
-                        <Route path="/" element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} />
-                        <Route path="/ledger" element={user ? <Ledger user={user} /> : <Navigate to="/login" />} />
-                        <Route path="/admin" element={user ? <Admin user={user} /> : <Navigate to="/login" />} />
+                        <Route path="/" element={
+                            <ProtectedRoute user={user} allowedRoles={['admin', 'desk', 'staff']}>
+                                <Dashboard user={user} />
+                            </ProtectedRoute>
+                        } />
+                        <Route path="/ledger" element={
+                            <ProtectedRoute user={user} allowedRoles={['admin', 'desk', 'staff']}>
+                                <Ledger user={user} />
+                            </ProtectedRoute>
+                        } />
+                        <Route path="/admin" element={
+                            <ProtectedRoute user={user} allowedRoles={['admin']}>
+                                <Admin user={user} />
+                            </ProtectedRoute>
+                        } />
                     </Routes>
                 </main>
             </div>

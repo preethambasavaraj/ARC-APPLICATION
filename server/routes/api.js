@@ -120,17 +120,42 @@ router.get('/bookings', async (req, res) => {
 // Get all bookings (ledger)
 router.get('/bookings/all', async (req, res) => {
     try {
-        const query = `
+        let { date, sport, customer } = req.query;
+        let queryParams = [];
+        let query = `
             SELECT 
                 b.*, 
                 c.name as court_name, 
-                u.username as created_by_user 
+                s.name as sport_name,
+                u.username as created_by_user,
+                DATE_FORMAT(b.date, '%Y-%m-%d') as date
             FROM bookings b 
             JOIN courts c ON b.court_id = c.id
+            JOIN sports s ON c.sport_id = s.id
             LEFT JOIN users u ON b.created_by_user_id = u.id
-            ORDER BY b.date DESC
         `;
-        const [rows] = await db.query(query);
+
+        let whereClauses = [];
+        if (date) {
+            whereClauses.push('b.date = ?');
+            queryParams.push(date);
+        }
+        if (sport) {
+            whereClauses.push('s.name LIKE ?');
+            queryParams.push(`%${sport}%`);
+        }
+        if (customer) {
+            whereClauses.push('b.customer_name LIKE ?');
+            queryParams.push(`%${customer}%`);
+        }
+
+        if (whereClauses.length > 0) {
+            query += ' WHERE ' + whereClauses.join(' AND ');
+        }
+
+        query += ' ORDER BY b.date DESC';
+
+        const [rows] = await db.query(query, queryParams);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -176,7 +201,16 @@ router.post('/bookings', async (req, res) => {
             return res.status(409).json({ message: 'The selected time slot is unavailable.' });
         }
 
-        const time_slot = `${startTime} - ${endTime}`;
+        const formatTo12Hour = (time) => {
+            let [hours, minutes] = time.split(':').map(Number);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // the hour '0' should be '12'
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            return `${hours}:${minutes} ${ampm}`;
+        };
+
+        const time_slot = `${formatTo12Hour(startTime)} - ${formatTo12Hour(endTime)}`;
         const sql = 'INSERT INTO bookings (court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
         const values = [court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid];
 

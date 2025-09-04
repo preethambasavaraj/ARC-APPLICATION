@@ -8,9 +8,9 @@ const Header = ({ user, onLogout }) => {
             <nav>
                 {user && (
                     <>
-                        <Link to="/">Dashboard</Link>
-                        <Link to="/ledger">Ledger</Link>
-                        <Link to="/admin">Admin</Link>
+                        {(user.role === 'admin' || user.role === 'desk' || user.role === 'staff') && <Link to="/">Dashboard</Link>}
+                        {(user.role === 'admin' || user.role === 'desk' || user.role === 'staff') && <Link to="/ledger">Ledger</Link>}
+                        {user.role === 'admin' && <Link to="/admin">Admin</Link>}
                         <button onClick={onLogout}>Logout</button>
                     </>
                 )}

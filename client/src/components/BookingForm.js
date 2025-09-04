@@ -35,7 +35,6 @@ const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSucces
             return;
         }
         try {
-            const time_slot = `${startTime} - ${endTime}`;
             const res = await axios.post('http://localhost:5000/api/bookings', {
                 court_id: courtId,
                 created_by_user_id: user.id,
@@ -43,7 +42,8 @@ const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSucces
                 customer_contact: customerContact,
                 customer_email: customerEmail,
                 date: selectedDate,
-                time_slot: time_slot,
+                startTime: startTime,
+                endTime: endTime,
                 payment_mode: paymentMode,
                 amount_paid: amountPaid
             });

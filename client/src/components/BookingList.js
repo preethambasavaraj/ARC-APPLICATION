@@ -6,6 +6,7 @@ const BookingList = ({ bookings }) => {
             <thead>
                 <tr>
                     <th>Booking ID</th>
+                    <th>Sport</th>
                     <th>Court</th>
                     <th>Customer</th>
                     <th>Booked-By</th>
@@ -21,6 +22,7 @@ const BookingList = ({ bookings }) => {
                 {bookings.map(booking => (
                     <tr key={booking.id}>
                         <td>{booking.id}</td>
+                        <td>{booking.sport_name}</td>
                         <td>{booking.court_name}</td>
                         <td>{booking.customer_name}</td>
                         <td>{booking.created_by_user || 'N/A'}</td>
