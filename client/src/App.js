@@ -5,6 +5,7 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Ledger from './components/Ledger';
 import Admin from './components/Admin';
+import Analytics from './components/Analytics';
 import './App.css';
 
 const ProtectedRoute = ({ user, allowedRoles, children }) => {
@@ -59,6 +60,11 @@ function App() {
                         <Route path="/admin" element={
                             <ProtectedRoute user={user} allowedRoles={['admin']}>
                                 <Admin user={user} />
+                            </ProtectedRoute>
+                        } />
+                        <Route path="/analytics" element={
+                            <ProtectedRoute user={user} allowedRoles={['admin']}>
+                                <Analytics />
                             </ProtectedRoute>
                         } />
                     </Routes>

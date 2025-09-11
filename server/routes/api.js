@@ -304,7 +304,94 @@ router.delete('/sports/:id', async (req, res) => {
     }
 });
 
+
+// Analytics: Summary
+router.get('/analytics/summary', async (req, res) => {
+    try {
+        const [[{ total_bookings }]] = await db.query('SELECT COUNT(*) as total_bookings FROM bookings');
+        const [[{ total_revenue }]] = await db.query('SELECT SUM(amount_paid) as total_revenue FROM bookings');
+        const [[{ total_sports }]] = await db.query('SELECT COUNT(*) as total_sports FROM sports');
+        const [[{ total_courts }]] = await db.query('SELECT COUNT(*) as total_courts FROM courts');
+
+        res.json({
+            total_bookings,
+            total_revenue,
+            total_sports,
+            total_courts
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Analytics: Bookings over time
+router.get('/analytics/bookings-over-time', async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT DATE(date) as date, COUNT(*) as count 
+            FROM bookings 
+            GROUP BY DATE(date) 
+            ORDER BY DATE(date) ASC
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Analytics: Revenue by sport
+router.get('/analytics/revenue-by-sport', async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT s.name, SUM(b.amount_paid) as revenue
+            FROM bookings b
+            JOIN sports s ON b.sport_id = s.id
+            GROUP BY s.name
+            ORDER BY revenue DESC
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Ledger Download
+router.get('/ledger/download', async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT 
+                b.id as booking_id,
+                b.customer_name,
+                b.customer_contact,
+                b.customer_email,
+                s.name as sport_name,
+                c.name as court_name,
+                DATE_FORMAT(b.date, '%Y-%m-%d') as date,
+                b.time_slot,
+                b.payment_mode,
+                b.amount_paid,
+                u.username as created_by
+            FROM bookings b
+            JOIN courts c ON b.court_id = c.id
+            JOIN sports s ON c.sport_id = s.id
+            LEFT JOIN users u ON b.created_by_user_id = u.id
+            ORDER BY b.id DESC
+        `);
+
+        const fields = ['booking_id', 'customer_name', 'customer_contact', 'customer_email', 'sport_name', 'court_name', 'date', 'time_slot', 'payment_mode', 'amount_paid', 'created_by'];
+        const json2csv = require('json2csv').parse;
+        const csv = json2csv(rows, { fields });
+
+        res.header('Content-Type', 'text/csv');
+        res.attachment('ledger.csv');
+        res.send(csv);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.post('/whatsapp', async (req, res) => {
+
     const twiml = new twilio.twiml.MessagingResponse();
     const userMessage = req.body.Body; // Use original case for names, etc.
     const trimmedMessage = userMessage.trim();
