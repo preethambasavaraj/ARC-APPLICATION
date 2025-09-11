@@ -1,0 +1,61 @@
+.active-bookings-container {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.active-bookings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.active-booking-card {
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.active-booking-card.active {
+    background-color: #e6ffed;
+    border-left: 5px solid #4caf50;
+}
+
+.active-booking-card.ended {
+    background-color: #ffebee;
+    border-left: 5px solid #f44336;
+}
+
+.ended-message {
+    color: #f44336;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sport-name {
+    font-weight: bold;
+}
+
+.court-name {
+    margin-left: 10px;
+}
+
+.clear-btn {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.clear-btn:hover {
+    background-color: #d32f2f;
+}

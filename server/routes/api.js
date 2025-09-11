@@ -170,6 +170,58 @@ router.get('/bookings/all', async (req, res) => {
     }
 });
 
+// Get active bookings
+router.get('/bookings/active', async (req, res) => {
+    try {
+        const now = new Date();
+        const today = now.toISOString().slice(0, 10);
+
+        const query = `
+            SELECT 
+                b.*, 
+                c.name as court_name, 
+                s.name as sport_name
+            FROM bookings b 
+            JOIN courts c ON b.court_id = c.id
+            JOIN sports s ON b.sport_id = s.id
+            WHERE b.date = ?
+        `;
+        const [bookings] = await db.query(query, [today]);
+
+        const parseTime = (timeStr) => {
+            const [time, modifier] = timeStr.split(' ');
+            let [hours, minutes] = time.split(':').map(Number);
+            if (modifier === 'PM' && hours < 12) {
+                hours += 12;
+            }
+            if (modifier === 'AM' && hours === 12) {
+                hours = 0;
+            }
+            const date = new Date();
+            date.setHours(hours, minutes, 0, 0);
+            return date;
+        };
+
+        const activeBookings = bookings.map(booking => {
+            const [startTimeStr, endTimeStr] = booking.time_slot.split(' - ');
+            const startTime = parseTime(startTimeStr);
+            const endTime = parseTime(endTimeStr);
+
+            let status = 'upcoming';
+            if (now >= startTime && now <= endTime) {
+                status = 'active';
+            } else if (now > endTime) {
+                status = 'ended';
+            }
+            return { ...booking, status, startTime, endTime };
+        }).filter(booking => booking.status === 'active' || booking.status === 'ended');
+
+        res.json(activeBookings);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 // Add a new booking
 router.post('/bookings', async (req, res) => {
