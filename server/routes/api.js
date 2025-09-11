@@ -110,9 +110,11 @@ router.get('/bookings', async (req, res) => {
             SELECT 
                 b.*, 
                 c.name as court_name, 
+                s.name as sport_name, 
                 u.username as created_by_user 
             FROM bookings b 
             JOIN courts c ON b.court_id = c.id
+            JOIN sports s ON b.sport_id = s.id
             LEFT JOIN users u ON b.created_by_user_id = u.id
             WHERE b.date = ?
         `;
