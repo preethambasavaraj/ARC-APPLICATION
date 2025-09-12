@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { jwtDecode } from 'jwt-decode';
 import Header from './components/Header';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -24,19 +26,35 @@ function App() {
     const [user, setUser] = useState(null);
 
     useEffect(() => {
-        const loggedInUser = localStorage.getItem('user');
-        if (loggedInUser) {
-            setUser(JSON.parse(loggedInUser));
+        const token = localStorage.getItem('token');
+        if (token) {
+            try {
+                const decodedUser = jwtDecode(token);
+                // Check if token is expired
+                const isExpired = decodedUser.exp * 1000 < Date.now();
+                if (isExpired) {
+                    handleLogout();
+                } else {
+                    setUser(decodedUser);
+                }
+            } catch (error) {
+                handleLogout();
+            }
         }
     }, []);
 
-    const handleLogin = (loggedInUser) => {
-        localStorage.setItem('user', JSON.stringify(loggedInUser));
-        setUser(loggedInUser);
+    const handleLogin = (token) => {
+        localStorage.setItem('token', token);
+        try {
+            const decodedUser = jwtDecode(token);
+            setUser(decodedUser);
+        } catch (error) {
+            console.error("Invalid token");
+        }
     };
 
     const handleLogout = () => {
-        localStorage.removeItem('user');
+        localStorage.removeItem('token');
         setUser(null);
     };
 

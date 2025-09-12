@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../api';
 import BookingForm from './BookingForm';
 import BookingList from './BookingList';
 import ActiveBookings from './ActiveBookings';
@@ -17,7 +17,7 @@ const Dashboard = ({ user }) => {
     const fetchAvailability = useCallback(async () => {
         if (selectedDate && startTime && endTime) {
             try {
-                const res = await axios.get(`http://localhost:5000/api/courts/availability`, { 
+                const res = await api.get(`/courts/availability`, { 
                     params: { 
                         date: selectedDate, 
                         startTime: startTime, 
@@ -32,7 +32,7 @@ const Dashboard = ({ user }) => {
     }, [selectedDate, startTime, endTime]);
 
     const fetchBookingsForDate = useCallback(async () => {
-        const res = await axios.get(`http://localhost:5000/api/bookings?date=${selectedDate}`);
+        const res = await api.get(`/bookings?date=${selectedDate}`);
         setBookings(res.data);
     }, [selectedDate]);
 

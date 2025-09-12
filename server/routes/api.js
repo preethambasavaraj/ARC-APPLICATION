@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database');
 const twilio = require('twilio');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
+const saltRounds = 10;
+const JWT_SECRET = process.env.JWT_SECRET || 'your_default_secret_key'; // Use environment variable for secret
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -9,13 +14,46 @@ const client = new twilio(accountSid, authToken);
 
 const userSessions = {};
 
+// Middleware to authenticate JWT
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token == null) return res.sendStatus(401); // if there isn't any token
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+};
+
+// Middleware to check if user is admin
+const isAdmin = (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+    }
+    next();
+};
+
+
 // Login
 router.post('/login', async (req, res) => {
     const { username, password } = req.body;
     try {
-        const [rows] = await db.query('SELECT * FROM users WHERE username = ? AND password = ?', [username, password]);
-        if (rows.length > 0) {
-            res.json({ success: true, user: rows[0] });
+        const [rows] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
+        if (rows.length === 0) {
+            return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        }
+
+        const user = rows[0];
+        const match = await bcrypt.compare(password, user.password);
+
+        if (match) {
+            // Create JWT
+            const tokenPayload = { id: user.id, username: user.username, role: user.role };
+            const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '1h' });
+            res.json({ success: true, token: token, user: tokenPayload });
         } else {
             res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
@@ -24,8 +62,32 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// Create a new user (Admin only)
+router.post('/admin/users', authenticateToken, isAdmin, async (req, res) => {
+    const { username, password, role } = req.body;
+
+    if (!username || !password || !role) {
+        return res.status(400).json({ message: 'Username, password, and role are required' });
+    }
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        const [result] = await db.query(
+            'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+            [username, hashedPassword, role]
+        );
+        res.status(201).json({ success: true, userId: result.insertId });
+    } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ message: 'Username already exists' });
+        }
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 // Get all sports
-router.get('/sports', async (req, res) => {
+router.get('/sports', authenticateToken, async (req, res) => {
     try {
         const [rows] = await db.query('SELECT * FROM sports');
         res.json(rows);
@@ -35,7 +97,7 @@ router.get('/sports', async (req, res) => {
 });
 
 // Get all courts
-router.get('/courts', async (req, res) => {
+router.get('/courts', authenticateToken, async (req, res) => {
     try {
         const [rows] = await db.query('SELECT c.id, c.name, c.status, s.name as sport_name, s.price FROM courts c JOIN sports s ON c.sport_id = s.id');
         res.json(rows);
@@ -45,7 +107,7 @@ router.get('/courts', async (req, res) => {
 });
 
 // Get court availability for a specific date and time
-router.get('/courts/availability', async (req, res) => {
+router.get('/courts/availability', authenticateToken, async (req, res) => {
     const { date, startTime, endTime } = req.query;
     if (!date || !startTime || !endTime) {
         return res.status(400).json({
@@ -103,7 +165,7 @@ router.get('/courts/availability', async (req, res) => {
 });
 
 // Get bookings for a specific date
-router.get('/bookings', async (req, res) => {
+router.get('/bookings', authenticateToken, async (req, res) => {
     const { date } = req.query;
     try {
         const query = `
@@ -126,7 +188,7 @@ router.get('/bookings', async (req, res) => {
 });
 
 // Get all bookings (ledger)
-router.get('/bookings/all', async (req, res) => {
+router.get('/bookings/all', authenticateToken, async (req, res) => {
     try {
         let { date, sport, customer } = req.query;
         let queryParams = [];
@@ -171,7 +233,7 @@ router.get('/bookings/all', async (req, res) => {
 });
 
 // Get active bookings
-router.get('/bookings/active', async (req, res) => {
+router.get('/bookings/active', authenticateToken, async (req, res) => {
     try {
         const now = new Date();
         const today = now.toISOString().slice(0, 10);
@@ -224,8 +286,9 @@ router.get('/bookings/active', async (req, res) => {
 
 
 // Add a new booking
-router.post('/bookings', async (req, res) => {
-    const { court_id, created_by_user_id, customer_name, customer_contact, customer_email, date, startTime, endTime, payment_mode, amount_paid } = req.body;
+router.post('/bookings', authenticateToken, async (req, res) => {
+    const { court_id, customer_name, customer_contact, customer_email, date, startTime, endTime, payment_mode, amount_paid } = req.body;
+    const created_by_user_id = req.user.id; // Get user ID from JWT
 
     try {
         const [courts] = await db.query('SELECT sport_id FROM courts WHERE id = ?', [court_id]);
@@ -282,7 +345,7 @@ router.post('/bookings', async (req, res) => {
 });
 
 // Update court status
-router.put('/courts/:id/status', async (req, res) => {
+router.put('/courts/:id/status', authenticateToken, isAdmin, async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     try {
@@ -294,7 +357,7 @@ router.put('/courts/:id/status', async (req, res) => {
 });
 
 // Add a new sport
-router.post('/sports', async (req, res) => {
+router.post('/sports', authenticateToken, isAdmin, async (req, res) => {
     const { name, price } = req.body;
     if (!name || price === undefined) {
         return res.status(400).json({ message: 'Sport name and price are required' });
@@ -308,7 +371,7 @@ router.post('/sports', async (req, res) => {
 });
 
 // Update sport price
-router.put('/sports/:id', async (req, res) => {
+router.put('/sports/:id', authenticateToken, isAdmin, async (req, res) => {
     const { id } = req.params;
     const { price } = req.body;
     if (price === undefined) {
@@ -323,7 +386,7 @@ router.put('/sports/:id', async (req, res) => {
 });
 
 // Add a new court
-router.post('/courts', async (req, res) => {
+router.post('/courts', authenticateToken, isAdmin, async (req, res) => {
     const { name, sport_id } = req.body;
     if (!name || !sport_id) {
         return res.status(400).json({ message: 'Court name and sport ID are required' });
@@ -337,7 +400,7 @@ router.post('/courts', async (req, res) => {
 });
 
 // Delete a court
-router.delete('/courts/:id', async (req, res) => {
+router.delete('/courts/:id', authenticateToken, isAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         await db.query('DELETE FROM courts WHERE id = ?', [id]);
@@ -348,7 +411,7 @@ router.delete('/courts/:id', async (req, res) => {
 });
 
 // Delete a sport
-router.delete('/sports/:id', async (req, res) => {
+router.delete('/sports/:id', authenticateToken, isAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         await db.query('DELETE FROM sports WHERE id = ?', [id]);
@@ -360,7 +423,7 @@ router.delete('/sports/:id', async (req, res) => {
 
 
 // Analytics: Summary
-router.get('/analytics/summary', async (req, res) => {
+router.get('/analytics/summary', authenticateToken, isAdmin, async (req, res) => {
     try {
         const [[{ total_bookings }]] = await db.query('SELECT COUNT(*) as total_bookings FROM bookings');
         const [[{ total_revenue }]] = await db.query('SELECT SUM(amount_paid) as total_revenue FROM bookings');
@@ -379,7 +442,7 @@ router.get('/analytics/summary', async (req, res) => {
 });
 
 // Analytics: Bookings over time
-router.get('/analytics/bookings-over-time', async (req, res) => {
+router.get('/analytics/bookings-over-time', authenticateToken, isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(`
             SELECT DATE(date) as date, COUNT(*) as count 
@@ -394,7 +457,7 @@ router.get('/analytics/bookings-over-time', async (req, res) => {
 });
 
 // Analytics: Revenue by sport
-router.get('/analytics/revenue-by-sport', async (req, res) => {
+router.get('/analytics/revenue-by-sport', authenticateToken, isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(`
             SELECT s.name, SUM(b.amount_paid) as revenue
@@ -410,7 +473,7 @@ router.get('/analytics/revenue-by-sport', async (req, res) => {
 });
 
 // Ledger Download
-router.get('/ledger/download', async (req, res) => {
+router.get('/ledger/download', authenticateToken, async (req, res) => {
     try {
         const [rows] = await db.query(`
             SELECT 
@@ -444,6 +507,7 @@ router.get('/ledger/download', async (req, res) => {
     }
 });
 
+// Note: The WhatsApp route is not protected by JWT auth as it's for external users.
 router.post('/whatsapp', async (req, res) => {
 
     const twiml = new twilio.twiml.MessagingResponse();

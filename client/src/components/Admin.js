@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api'; // Import the api instance
 import { useNavigate } from 'react-router-dom';
 
 const Admin = () => {
@@ -12,25 +12,30 @@ const Admin = () => {
     const [message, setMessage] = useState('');
     const navigate = useNavigate();
 
+    // State for new user form
+    const [newUsername, setNewUsername] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [newRole, setNewRole] = useState('staff');
+
     useEffect(() => {
         fetchSports();
         fetchCourts();
     }, []);
 
     const fetchSports = async () => {
-        const res = await axios.get('http://localhost:5000/api/sports');
+        const res = await api.get('/sports');
         setSports(res.data);
     };
 
     const fetchCourts = async () => {
-        const res = await axios.get('http://localhost:5000/api/courts');
+        const res = await api.get('/courts');
         setCourts(res.data);
     };
 
     const handleAddSport = async (e) => {
         e.preventDefault();
         try {
-            await axios.post('http://localhost:5000/api/sports', { name: newSportName, price: newSportPrice });
+            await api.post('/sports', { name: newSportName, price: newSportPrice });
             setNewSportName('');
             setNewSportPrice('');
             fetchSports();
@@ -43,7 +48,7 @@ const Admin = () => {
     const handleAddCourt = async (e) => {
         e.preventDefault();
         try {
-            await axios.post('http://localhost:5000/api/courts', { name: newCourtName, sport_id: selectedSportId });
+            await api.post('/courts', { name: newCourtName, sport_id: selectedSportId });
             setNewCourtName('');
             setSelectedSportId('');
             fetchCourts(); // Refresh court list
@@ -63,7 +68,7 @@ const Admin = () => {
     const handleUpdatePrice = async (sportId) => {
         const sportToUpdate = sports.find(s => s.id === sportId);
         try {
-            await axios.put(`http://localhost:5000/api/sports/${sportId}`, { price: sportToUpdate.price });
+            await api.put(`/sports/${sportId}`, { price: sportToUpdate.price });
             setMessage(`Price for ${sportToUpdate.name} updated successfully!`);
         } catch (err) {
             setMessage(err.response?.data?.message || 'Error updating price');
@@ -73,7 +78,7 @@ const Admin = () => {
     const handleDeleteSport = async (sportId) => {
         if (window.confirm('Are you sure? Deleting a sport will also delete all of its courts.')) {
             try {
-                await axios.delete(`http://localhost:5000/api/sports/${sportId}`);
+                await api.delete(`/sports/${sportId}`);
                 fetchSports();
                 fetchCourts();
                 setMessage('Sport deleted successfully!');
@@ -86,12 +91,25 @@ const Admin = () => {
     const handleDeleteCourt = async (courtId) => {
         if (window.confirm('Are you sure you want to delete this court?')) {
             try {
-                await axios.delete(`http://localhost:5000/api/courts/${courtId}`);
+                await api.delete(`/courts/${courtId}`);
                 fetchCourts();
                 setMessage('Court deleted successfully!');
             } catch (err) {
                 setMessage(err.response ? err.response.data.message : err.message || 'Error deleting court');
             }
+        }
+    };
+
+    const handleAddUser = async (e) => {
+        e.preventDefault();
+        try {
+            await api.post('/admin/users', { username: newUsername, password: newPassword, role: newRole });
+            setNewUsername('');
+            setNewPassword('');
+            setNewRole('staff');
+            setMessage('User added successfully!');
+        } catch (err) {
+            setMessage(err.response?.data?.message || 'Error adding user');
         }
     };
 
@@ -102,6 +120,30 @@ const Admin = () => {
 
             <div style={{ marginBottom: '20px' }}>
                 <button onClick={() => navigate('/analytics')}>View Analytics</button>
+            </div>
+
+            {/* User Creation Form */}
+            <div style={{ marginBottom: '40px' }}>
+                 <h3>Add a New User</h3>
+                    <form onSubmit={handleAddUser}>
+                        <div>
+                            <label>Username</label>
+                            <input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} required />
+                        </div>
+                        <div>
+                            <label>Password</label>
+                            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+                        </div>
+                        <div>
+                            <label>Role</label>
+                            <select value={newRole} onChange={(e) => setNewRole(e.target.value)} required>
+                                <option value="staff">Staff</option>
+                                <option value="desk">Desk</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <button type="submit">Add User</button>
+                    </form>
             </div>
 
             <div style={{ display: 'flex', gap: '40px', marginBottom: '40px' }}>
