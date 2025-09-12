@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 const getClearedIdsFromStorage = () => {
     try {
@@ -26,7 +26,7 @@ export const useActiveBookings = () => {
 
     const fetchActiveBookings = useCallback(async () => {
         try {
-            const res = await axios.get(`http://localhost:5000/api/bookings/active`);
+            const res = await api.get(`/bookings/active`);
             setActiveBookings(res.data);
         } catch (error) {
             console.error("Error fetching active bookings:", error);
