@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import BookingList from './BookingList';
 
 const Ledger = () => {
@@ -9,7 +9,7 @@ const Ledger = () => {
     useEffect(() => {
         const fetchFilteredBookings = async () => {
             const { date, sport, customer } = filters;
-            const res = await axios.get('http://localhost:5000/api/bookings/all', {
+            const res = await api.get('/bookings/all', {
                 params: { date, sport, customer }
             });
             setBookings(res.data);

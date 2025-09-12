@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSuccess, user }) => {
     const [courtId, setCourtId] = useState('');
@@ -35,9 +35,8 @@ const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSucces
             return;
         }
         try {
-            const res = await axios.post('http://localhost:5000/api/bookings', {
+            const res = await api.post('/bookings', {
                 court_id: courtId,
-                created_by_user_id: user.id,
                 customer_name: customerName,
                 customer_contact: customerContact,
                 customer_email: customerEmail,

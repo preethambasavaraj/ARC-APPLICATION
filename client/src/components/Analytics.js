@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import { Line, Pie } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
@@ -31,10 +31,10 @@ const Analytics = () => {
     useEffect(() => {
         const fetchAnalyticsData = async () => {
             try {
-                const summaryRes = await axios.get('http://localhost:5000/api/analytics/summary');
+                const summaryRes = await api.get('/analytics/summary');
                 setSummary(summaryRes.data);
 
-                const bookingsOverTimeRes = await axios.get('http://localhost:5000/api/analytics/bookings-over-time');
+                const bookingsOverTimeRes = await api.get('/analytics/bookings-over-time');
                 setBookingsOverTime({
                     labels: bookingsOverTimeRes.data.map(d => new Date(d.date).toLocaleDateString()),
                     datasets: [{
@@ -46,7 +46,7 @@ const Analytics = () => {
                     }]
                 });
 
-                const revenueBySportRes = await axios.get('http://localhost:5000/api/analytics/revenue-by-sport');
+                const revenueBySportRes = await api.get('/analytics/revenue-by-sport');
                 setRevenueBySport({
                     labels: revenueBySportRes.data.map(d => d.name),
                     datasets: [{
@@ -80,8 +80,21 @@ const Analytics = () => {
         fetchAnalyticsData();
     }, []);
 
-    const handleDownloadLedger = () => {
-        window.open('http://localhost:5000/api/ledger/download');
+    const handleDownloadLedger = async () => {
+        try {
+            const response = await api.get('/ledger/download', {
+                responseType: 'blob', // Important
+            });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'ledger.csv');
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+        } catch (error) {
+            console.error('Error downloading ledger:', error);
+        }
     };
 
     return (
