@@ -1,0 +1,52 @@
+.analytics-container {
+    padding: 20px;
+}
+
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.card {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+}
+
+.card h4 {
+    margin-top: 0;
+    font-size: 1.2em;
+}
+
+.card p {
+    font-size: 2em;
+    font-weight: bold;
+    margin: 10px 0 0;
+}
+
+.download-ledger {
+    margin-bottom: 30px;
+}
+
+.download-ledger button {
+    padding: 10px 20px;
+    font-size: 1em;
+    cursor: pointer;
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+}
+
+.chart-card {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+}

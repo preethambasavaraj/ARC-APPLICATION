@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import BookingForm from './BookingForm';
 import BookingList from './BookingList';
+import ActiveBookings from './ActiveBookings';
+import { useActiveBookings } from '../hooks/useActiveBookings';
+import './ActiveBookings.css';
 
 const Dashboard = ({ user }) => {
     const [bookings, setBookings] = useState([]);
@@ -9,6 +12,7 @@ const Dashboard = ({ user }) => {
     const [startTime, setStartTime] = useState('09:00');
     const [endTime, setEndTime] = useState('10:00');
     const [availability, setAvailability] = useState([]);
+    const { bookings: activeBookings, removeBooking: handleRemoveEndedBooking } = useActiveBookings();
 
     const fetchAvailability = useCallback(async () => {
         if (selectedDate && startTime && endTime) {
@@ -40,6 +44,7 @@ const Dashboard = ({ user }) => {
 
         fetchData();
         window.addEventListener('focus', fetchData);
+
         return () => {
             window.removeEventListener('focus', fetchData);
         };
@@ -126,6 +131,12 @@ const Dashboard = ({ user }) => {
                         endTime={endTime}
                         onBookingSuccess={handleBookingSuccess}
                         user={user}
+                    />
+                </div>
+                 <div style={{ flex: 1 }}>
+                    <ActiveBookings 
+                        bookings={activeBookings}
+                        onRemoveBooking={handleRemoveEndedBooking} 
                     />
                 </div>
             </div>

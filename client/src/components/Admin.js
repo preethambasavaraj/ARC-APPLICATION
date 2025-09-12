@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const Admin = () => {
     const [sports, setSports] = useState([]);
@@ -9,6 +10,7 @@ const Admin = () => {
     const [newCourtName, setNewCourtName] = useState('');
     const [selectedSportId, setSelectedSportId] = useState('');
     const [message, setMessage] = useState('');
+    const navigate = useNavigate();
 
     useEffect(() => {
         fetchSports();
@@ -97,6 +99,11 @@ const Admin = () => {
         <div>
             <h2>Admin Panel</h2>
             {message && <p>{message}</p>}
+
+            <div style={{ marginBottom: '20px' }}>
+                <button onClick={() => navigate('/analytics')}>View Analytics</button>
+            </div>
+
             <div style={{ display: 'flex', gap: '40px', marginBottom: '40px' }}>
                 <div style={{ flex: 1 }}>
                     <h3>Add a New Sport</h3>
