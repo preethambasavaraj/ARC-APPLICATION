@@ -516,6 +516,15 @@ router.post('/whatsapp', async (req, res) => {
     const from = req.body.From;
     const to = req.body.To;
 
+    const formatTo12Hour = (time) => {
+        let [hours, minutes] = time.split(':').map(Number);
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12; // the hour '0' should be '12'
+        minutes = minutes < 10 ? '0' + minutes : minutes;
+        return `${hours}:${minutes} ${ampm}`;
+    };
+
     let session = userSessions[from];
 
     if (!session) {
@@ -577,7 +586,7 @@ router.post('/whatsapp', async (req, res) => {
                 session.startTime = trimmedMessage;
                 session.endTime = `${String(startHour + 1).padStart(2, '0')}:00`; // Assume 1 hour booking
 
-                const time_slot_12hr = `${session.startTime} - ${session.endTime}`;
+                const time_slot_12hr = `${formatTo12Hour(session.startTime)} - ${formatTo12Hour(session.endTime)}`;
 
                 const [availableCourts] = await db.query(
                     'SELECT c.id, c.name FROM courts c LEFT JOIN bookings b ON c.id = b.court_id AND b.date = ? AND b.time_slot = ? WHERE c.sport_id = ? AND c.status = \"Available\" AND b.id IS NULL',
@@ -607,7 +616,7 @@ router.post('/whatsapp', async (req, res) => {
                     break;
                 }
                 session.customer_contact = trimmedMessage;
-                const time_slot = `${session.startTime} - ${session.endTime}`;
+                const time_slot = `${formatTo12Hour(session.startTime)} - ${formatTo12Hour(session.endTime)}`;
                 const sql = 'INSERT INTO bookings (court_id, sport_id, customer_name, customer_contact, date, time_slot, payment_mode, amount_paid, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
                 const values = [session.court_id, session.sport_id, session.customer_name, session.customer_contact, session.date, time_slot, 'online', session.amount, 'Booked'];
                 
@@ -625,7 +634,7 @@ Contact: ${session.customer_contact}
 Sport: ${session.sport_name}
 Court: ${session.court_name}
 Date: ${session.date}
-Time: ${session.startTime} - ${session.endTime}
+Time: ${time_slot}
 Amount: ₹${session.amount}
 Status: Booked
 -------------------------
