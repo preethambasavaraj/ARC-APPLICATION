@@ -72,7 +72,7 @@ const Dashboard = ({ user }) => {
 
     return (
         <div>
-            <h2>Dashboard</h2>
+            <h2>Bookings</h2>
 
             <div>
                 <h3>Check Availability & Book</h3>
