@@ -276,7 +276,7 @@ router.get('/bookings/active', authenticateToken, async (req, res) => {
                 status = 'ended';
             }
             return { ...booking, status, startTime, endTime };
-        }).filter(booking => booking.status === 'active' || booking.status === 'ended');
+        });
 
         res.json(activeBookings);
     } catch (err) {
