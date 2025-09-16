@@ -1,6 +1,13 @@
 import React from 'react';
 
-const BookingList = ({ bookings }) => {
+const BookingList = ({ bookings, onEdit, onCancel }) => {
+    const rowStyle = (booking) => {
+        if (booking.status === 'Cancelled') {
+            return { textDecoration: 'line-through', color: '#999' };
+        }
+        return {};
+    };
+
     return (
         <table>
             <thead>
@@ -11,27 +18,36 @@ const BookingList = ({ bookings }) => {
                     <th>Customer</th>
                     <th>Booked-By</th>
                     <th>Contact</th>
-                    <th>Email</th>
                     <th>Time Slot</th>
-                    <th>Payment</th>
-                    <th>Amount</th>
-                    <th>Status</th>
+                    <th>Amount Paid</th>
+                    <th>Balance</th>
+                    <th>Payment Status</th>
+                    <th>Booking Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {bookings.map(booking => (
-                    <tr key={booking.id}>
+                    <tr key={booking.id} style={rowStyle(booking)}>
                         <td>{booking.id}</td>
                         <td>{booking.sport_name}</td>
                         <td>{booking.court_name}</td>
                         <td>{booking.customer_name}</td>
                         <td>{booking.created_by_user || 'N/A'}</td>
                         <td>{booking.customer_contact}</td>
-                        <td>{booking.customer_email}</td>
                         <td>{booking.time_slot}</td>
-                        <td>{booking.payment_mode}</td>
                         <td>{booking.amount_paid}</td>
+                        <td>{booking.balance_amount}</td>
+                        <td>{booking.payment_status}</td>
                         <td>{booking.status}</td>
+                        <td>
+                            {booking.status !== 'Cancelled' && (
+                                <>
+                                    <button onClick={() => onEdit(booking)}>Edit Payment</button>
+                                    <button onClick={() => onCancel(booking.id)}>Cancel</button>
+                                </>
+                            )}
+                        </td>
                     </tr>
                 ))}
             </tbody>

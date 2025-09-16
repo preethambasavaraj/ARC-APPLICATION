@@ -3,6 +3,7 @@ import api from '../api';
 import BookingForm from './BookingForm';
 import BookingList from './BookingList';
 import ActiveBookings from './ActiveBookings';
+import EditBookingModal from './EditBookingModal';
 import { useActiveBookings } from '../hooks/useActiveBookings';
 import './ActiveBookings.css';
 
@@ -13,6 +14,9 @@ const Dashboard = ({ user }) => {
     const [endTime, setEndTime] = useState('10:00');
     const [availability, setAvailability] = useState([]);
     const { bookings: activeBookings, removeBooking: handleRemoveEndedBooking } = useActiveBookings();
+
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedBooking, setSelectedBooking] = useState(null);
 
     const fetchAvailability = useCallback(async () => {
         if (selectedDate && startTime && endTime) {
@@ -32,8 +36,12 @@ const Dashboard = ({ user }) => {
     }, [selectedDate, startTime, endTime]);
 
     const fetchBookingsForDate = useCallback(async () => {
-        const res = await api.get(`/bookings?date=${selectedDate}`);
-        setBookings(res.data);
+        try {
+            const res = await api.get(`/bookings/all`, { params: { date: selectedDate } });
+            setBookings(res.data);
+        } catch (err) {
+            console.error("Error fetching bookings for date:", err);
+        }
     }, [selectedDate]);
 
     useEffect(() => {
@@ -60,6 +68,37 @@ const Dashboard = ({ user }) => {
         setStartTime(start);
         setEndTime(end);
     }
+
+    const handleEditClick = (booking) => {
+        setSelectedBooking(booking);
+        setIsModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setSelectedBooking(null);
+    };
+
+    const handleSavePayment = async (bookingId, paymentData) => {
+        try {
+            await api.put(`/bookings/${bookingId}/payment`, paymentData);
+            handleCloseModal();
+            fetchBookingsForDate(); // Refresh data
+        } catch (error) {
+            console.error("Error updating payment:", error);
+        }
+    };
+
+    const handleCancelClick = async (bookingId) => {
+        if (window.confirm('Are you sure you want to cancel this booking?')) {
+            try {
+                await api.put(`/bookings/${bookingId}/cancel`);
+                fetchBookingsForDate(); // Refresh data
+            } catch (error) {
+                console.error("Error cancelling booking:", error);
+            }
+        }
+    };
 
     const timeSlots = Array.from({ length: 16 }, (_, i) => {
         const startHour = 6 + i;
@@ -143,8 +182,19 @@ const Dashboard = ({ user }) => {
 
             <div style={{marginTop: '20px'}}>
                 <h3>Bookings for {selectedDate}</h3>
-                <BookingList bookings={bookings} />
+                <BookingList 
+                    bookings={bookings} 
+                    onEdit={handleEditClick} 
+                    onCancel={handleCancelClick} 
+                />
             </div>
+            {isModalOpen && (
+                <EditBookingModal 
+                    booking={selectedBooking}
+                    onSave={handleSavePayment}
+                    onClose={handleCloseModal}
+                />
+            )}
         </div>
     );
 };

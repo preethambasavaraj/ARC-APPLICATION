@@ -111,6 +111,10 @@ const Analytics = () => {
                     <p>₹{summary.total_revenue}</p>
                 </div>
                 <div className="card">
+                    <h4>Total Cancellations</h4>
+                    <p>{summary.total_cancellations}</p>
+                </div>
+                <div className="card">
                     <h4>Sports Offered</h4>
                     <p>{summary.total_sports}</p>
                 </div>

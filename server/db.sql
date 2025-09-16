@@ -54,6 +54,12 @@ INSERT INTO `courts` (sport_id, name) VALUES
 (4, 'Swimming Lane 1'),
 (5, 'Pickleball Court 1');
 
+
+
+  ALTER TABLE bookings
+  ADD COLUMN balance_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+  ADD COLUMN payment_status VARCHAR(20) NOT NULL DEFAULT 'Pending';
+
 select * from bookings;
 select * from courts;
 

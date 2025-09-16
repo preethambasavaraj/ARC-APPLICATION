@@ -197,6 +197,7 @@ router.get('/bookings/all', authenticateToken, async (req, res) => {
                 b.*, 
                 c.name as court_name, 
                 s.name as sport_name,
+                s.price as total_amount,
                 u.username as created_by_user,
                 DATE_FORMAT(b.date, '%Y-%m-%d') as date
             FROM bookings b 
@@ -297,7 +298,19 @@ router.post('/bookings', authenticateToken, async (req, res) => {
         }
         const sport_id = courts[0].sport_id;
 
-        const [existingBookings] = await db.query('SELECT time_slot FROM bookings WHERE court_id = ? AND date = ?', [court_id, date]);
+        const [sports] = await db.query('SELECT price FROM sports WHERE id = ?', [sport_id]);
+        if (sports.length === 0) {
+            return res.status(404).json({ message: 'Sport not found' });
+        }
+        const total_amount = sports[0].price;
+        const balance_amount = total_amount - amount_paid;
+
+        let payment_status = 'Pending';
+        if (amount_paid > 0) {
+            payment_status = balance_amount <= 0 ? 'Completed' : 'Received';
+        }
+
+        const [existingBookings] = await db.query('SELECT time_slot FROM bookings WHERE court_id = ? AND date = ? AND status != \'Cancelled\'', [court_id, date]);
         
         const toMinutes = (timeStr) => {
             const [time, modifier] = timeStr.split(' ');
@@ -334,11 +347,53 @@ router.post('/bookings', authenticateToken, async (req, res) => {
         };
 
         const time_slot = `${formatTo12Hour(startTime)} - ${formatTo12Hour(endTime)}`;
-        const sql = 'INSERT INTO bookings (court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
-        const values = [court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid];
+        const sql = 'INSERT INTO bookings (court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid, balance_amount, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+        const values = [court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid, balance_amount, payment_status];
 
         const [result] = await db.query(sql, values);
         res.json({ success: true, bookingId: result.insertId });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Update payment status for a booking
+router.put('/bookings/:id/payment', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { amount_paid, payment_status } = req.body;
+
+    try {
+        // First, get the full price of the booking's sport
+        const [bookings] = await db.query('SELECT sport_id FROM bookings WHERE id = ?', [id]);
+        if (bookings.length === 0) {
+            return res.status(404).json({ message: 'Booking not found' });
+        }
+        const sport_id = bookings[0].sport_id;
+
+        const [sports] = await db.query('SELECT price FROM sports WHERE id = ?', [sport_id]);
+        if (sports.length === 0) {
+            return res.status(404).json({ message: 'Sport not found for this booking' });
+        }
+        const total_amount = sports[0].price;
+
+        const new_balance = total_amount - amount_paid;
+
+        await db.query(
+            'UPDATE bookings SET amount_paid = ?, balance_amount = ?, payment_status = ? WHERE id = ?',
+            [amount_paid, new_balance, payment_status, id]
+        );
+        res.json({ success: true, message: 'Payment updated successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Cancel a booking
+router.put('/bookings/:id/cancel', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query("UPDATE bookings SET status = 'Cancelled' WHERE id = ?", [id]);
+        res.json({ success: true, message: 'Booking cancelled successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -425,14 +480,16 @@ router.delete('/sports/:id', authenticateToken, isAdmin, async (req, res) => {
 // Analytics: Summary
 router.get('/analytics/summary', authenticateToken, isAdmin, async (req, res) => {
     try {
-        const [[{ total_bookings }]] = await db.query('SELECT COUNT(*) as total_bookings FROM bookings');
-        const [[{ total_revenue }]] = await db.query('SELECT SUM(amount_paid) as total_revenue FROM bookings');
+        const [[{ total_bookings }]] = await db.query('SELECT COUNT(*) as total_bookings FROM bookings WHERE status != \'Cancelled\'');
+        const [[{ total_revenue }]] = await db.query('SELECT SUM(amount_paid) as total_revenue FROM bookings WHERE status != \'Cancelled\'');
+        const [[{ total_cancellations }]] = await db.query('SELECT COUNT(*) as total_cancellations FROM bookings WHERE status = \'Cancelled\'');
         const [[{ total_sports }]] = await db.query('SELECT COUNT(*) as total_sports FROM sports');
         const [[{ total_courts }]] = await db.query('SELECT COUNT(*) as total_courts FROM courts');
 
         res.json({
             total_bookings,
             total_revenue,
+            total_cancellations,
             total_sports,
             total_courts
         });
@@ -463,6 +520,7 @@ router.get('/analytics/revenue-by-sport', authenticateToken, isAdmin, async (req
             SELECT s.name, SUM(b.amount_paid) as revenue
             FROM bookings b
             JOIN sports s ON b.sport_id = s.id
+            WHERE b.status != 'Cancelled'
             GROUP BY s.name
             ORDER BY revenue DESC
         `);
@@ -487,6 +545,9 @@ router.get('/ledger/download', authenticateToken, async (req, res) => {
                 b.time_slot,
                 b.payment_mode,
                 b.amount_paid,
+                b.balance_amount,
+                b.payment_status,
+                b.status as booking_status,
                 u.username as created_by
             FROM bookings b
             JOIN courts c ON b.court_id = c.id
@@ -495,7 +556,7 @@ router.get('/ledger/download', authenticateToken, async (req, res) => {
             ORDER BY b.id DESC
         `);
 
-        const fields = ['booking_id', 'customer_name', 'customer_contact', 'customer_email', 'sport_name', 'court_name', 'date', 'time_slot', 'payment_mode', 'amount_paid', 'created_by'];
+        const fields = ['booking_id', 'customer_name', 'customer_contact', 'customer_email', 'sport_name', 'court_name', 'date', 'time_slot', 'payment_mode', 'amount_paid', 'balance_amount', 'payment_status', 'booking_status', 'created_by'];
         const json2csv = require('json2csv').parse;
         const csv = json2csv(rows, { fields });
 

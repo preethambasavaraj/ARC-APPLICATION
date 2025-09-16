@@ -7,26 +7,41 @@ const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSucces
     const [customerContact, setCustomerContact] = useState('');
     const [customerEmail, setCustomerEmail] = useState('');
     const [paymentMode, setPaymentMode] = useState('cash');
-    const [amountPaid, setAmountPaid] = useState('');
+    const [amountPaid, setAmountPaid] = useState(0);
+    const [totalPrice, setTotalPrice] = useState(0);
+    const [balance, setBalance] = useState(0);
     const [message, setMessage] = useState('');
 
     useEffect(() => {
         // When available courts change, reset the form
         setCourtId('');
-        setAmountPaid('');
+        setAmountPaid(0);
+        setTotalPrice(0);
+        setBalance(0);
     }, [courts]);
 
     useEffect(() => {
-        // When a court is selected, auto-fill the price
+        // When a court is selected, auto-fill the price and calculate balance
         if (courtId) {
             const selectedCourt = courts.find(c => c.id === parseInt(courtId));
             if (selectedCourt) {
-                setAmountPaid(selectedCourt.price);
+                const price = selectedCourt.price || 0;
+                setTotalPrice(price);
+                setAmountPaid(price); // Default to full amount paid
+                setBalance(0);
             }
         } else {
-            setAmountPaid('');
+            setTotalPrice(0);
+            setAmountPaid(0);
+            setBalance(0);
         }
     }, [courtId, courts]);
+
+    const handleAmountPaidChange = (e) => {
+        const newAmountPaid = parseFloat(e.target.value) || 0;
+        setAmountPaid(newAmountPaid);
+        setBalance(totalPrice - newAmountPaid);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -52,7 +67,9 @@ const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSucces
             setCustomerContact('');
             setCustomerEmail('');
             setPaymentMode('cash');
-            setAmountPaid('');
+            setAmountPaid(0);
+            setTotalPrice(0);
+            setBalance(0);
             setCourtId('');
             onBookingSuccess();
         } catch (err) {
@@ -69,7 +86,7 @@ const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSucces
                 <select value={courtId} onChange={(e) => setCourtId(e.target.value)} required>
                     <option value="">Select an Available Court</option>
                     {courts.map(court => (
-                        <option key={court.id} value={court.id}>{court.name} ({court.sport_name})</option>
+                        <option key={court.id} value={court.id}>{court.name} ({court.sport_name}) - ₹{court.price}</option>
                     ))}
                 </select>
             </div>
@@ -94,7 +111,11 @@ const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSucces
             </div>
             <div>
                 <label>Amount Paid</label>
-                <input type="number" value={amountPaid} required placeholder="Select a court to see price" readOnly />
+                <input type="number" value={amountPaid} onChange={handleAmountPaidChange} required />
+            </div>
+            <div>
+                <label>Balance</label>
+                <input type="number" value={balance} readOnly style={{ backgroundColor: '#f0f0f0' }} />
             </div>
             <button type="submit">Create Booking</button>
         </form>
