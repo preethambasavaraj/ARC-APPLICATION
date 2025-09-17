@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api';
 import BookingList from './BookingList';
 import EditBookingModal from './EditBookingModal';
+import ReceiptModal from './ReceiptModal';
 
 const Ledger = () => {
     const [bookings, setBookings] = useState([]);
     const [filters, setFilters] = useState({ date: '', sport: '', customer: '' });
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState(null);
 
     const fetchFilteredBookings = useCallback(async () => {
@@ -31,11 +33,17 @@ const Ledger = () => {
 
     const handleEditClick = (booking) => {
         setSelectedBooking(booking);
-        setIsModalOpen(true);
+        setIsEditModalOpen(true);
+    };
+
+    const handleReceiptClick = (booking) => {
+        setSelectedBooking(booking);
+        setIsReceiptModalOpen(true);
     };
 
     const handleCloseModal = () => {
-        setIsModalOpen(false);
+        setIsEditModalOpen(false);
+        setIsReceiptModalOpen(false);
         setSelectedBooking(null);
     };
 
@@ -60,10 +68,6 @@ const Ledger = () => {
         }
     };
 
-    const handleReceiptClick = (bookingId) => {
-        window.open(`/receipt/${bookingId}`, '_blank');
-    };
-
     return (
         <div>
             <h2>Booking Ledger</h2>
@@ -78,10 +82,16 @@ const Ledger = () => {
                 onCancel={handleCancelClick} 
                 onReceipt={handleReceiptClick}
             />
-            {isModalOpen && (
+            {isEditModalOpen && (
                 <EditBookingModal 
                     booking={selectedBooking}
                     onSave={handleSavePayment}
+                    onClose={handleCloseModal}
+                />
+            )}
+            {isReceiptModalOpen && (
+                <ReceiptModal 
+                    booking={selectedBooking}
                     onClose={handleCloseModal}
                 />
             )}

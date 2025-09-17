@@ -1,0 +1,94 @@
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 700px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-actions {
+    text-align: right;
+    margin-top: 20px;
+}
+
+.modal-actions button {
+    margin-left: 10px;
+    padding: 8px 16px;
+    cursor: pointer;
+}
+
+/* Receipt-specific styles, copied and adapted from before */
+.receipt-header {
+    text-align: center;
+    border-bottom: 2px dashed #ccc;
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
+}
+.receipt-header h1 {
+    margin: 0;
+    font-size: 2rem;
+}
+.receipt-section {
+    margin-bottom: 1.5rem;
+}
+.receipt-section h2, .receipt-section h3 {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+.receipt-body p {
+    margin: 0.5rem 0;
+}
+.receipt-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 2px dashed #ccc;
+}
+.qr-code {
+    text-align: center;
+}
+.qr-code p {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.5rem;
+}
+.booking-info {
+    text-align: right;
+}
+.status {
+    padding: 3px 8px;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: bold;
+}
+.status.Completed, .status.Booked {
+    background-color: #28a745;
+}
+.status.Pending {
+    background-color: #ffc107;
+    color: #000;
+}
+.status.Received {
+    background-color: #17a2b8;
+}
+.status.Cancelled {
+    background-color: #dc3545;
+}

@@ -4,6 +4,7 @@ const db = require('../database');
 const twilio = require('twilio');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const PDFDocument = require('pdfkit');
 
 const saltRounds = 10;
 const JWT_SECRET = process.env.JWT_SECRET || 'your_default_secret_key'; // Use environment variable for secret
@@ -202,7 +203,7 @@ router.get('/bookings/all', authenticateToken, async (req, res) => {
                 DATE_FORMAT(b.date, '%Y-%m-%d') as date
             FROM bookings b 
             JOIN courts c ON b.court_id = c.id
-            JOIN sports s ON c.sport_id = s.id
+            JOIN sports s ON b.sport_id = s.id
             LEFT JOIN users u ON b.created_by_user_id = u.id
         `;
 
@@ -285,8 +286,8 @@ router.get('/bookings/active', authenticateToken, async (req, res) => {
     }
 });
 
-// Get details for a single booking (for receipt)
-router.get('/booking/:id', async (req, res) => {
+// Generate PDF receipt
+router.get('/booking/:id/receipt.pdf', async (req, res) => {
     const { id } = req.params;
     try {
         const query = `
@@ -313,11 +314,55 @@ router.get('/booking/:id', async (req, res) => {
         `;
         const [rows] = await db.query(query, [id]);
         if (rows.length === 0) {
-            return res.status(404).json({ message: 'Booking not found' });
+            return res.status(404).send('Booking not found');
         }
-        res.json(rows[0]);
+        const booking = rows[0];
+
+        const doc = new PDFDocument({ size: 'A4', margin: 50 });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="receipt-${booking.booking_id}.pdf"`);
+
+        doc.pipe(res);
+
+        // Header
+        doc.fontSize(20).text('ARC SportsZone Booking Receipt', { align: 'center' });
+        doc.moveDown();
+
+        // Booking Details
+        doc.fontSize(12).text(`Booking ID: ${booking.booking_id}`);
+        doc.text(`Date: ${booking.date}`);
+        doc.text(`Time: ${booking.time_slot}`);
+        doc.moveDown();
+
+        // Customer Details
+        doc.fontSize(14).text('Customer Details', { underline: true });
+        doc.fontSize(12).text(`Name: ${booking.customer_name}`);
+        doc.text(`Contact: ${booking.customer_contact}`);
+        doc.moveDown();
+        
+        // Booking Info
+        doc.fontSize(14).text('Booking Information', { underline: true });
+        doc.fontSize(12).text(`Sport: ${booking.sport_name}`);
+        doc.text(`Court: ${booking.court_name}`);
+        doc.moveDown();
+
+        // Payment Details
+        doc.fontSize(14).text('Payment Details', { underline: true });
+        doc.fontSize(12).text(`Total Amount: Rs. ${booking.total_amount}`);
+        doc.text(`Amount Paid: Rs. ${booking.amount_paid}`);
+        doc.font('Helvetica-Bold').text(`Balance: Rs. ${booking.balance_amount}`);
+        doc.font('Helvetica').text(`Payment Status: ${booking.payment_status}`);
+        doc.moveDown();
+
+        // Footer
+        doc.fontSize(10).text('Thank you for your booking!', { align: 'center' });
+
+        doc.end();
+
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err);
+        res.status(500).send('Error generating PDF');
     }
 });
 
@@ -587,7 +632,7 @@ router.get('/ledger/download', authenticateToken, async (req, res) => {
                 u.username as created_by
             FROM bookings b
             JOIN courts c ON b.court_id = c.id
-            JOIN sports s ON c.sport_id = s.id
+            JOIN sports s ON b.sport_id = s.id
             LEFT JOIN users u ON b.created_by_user_id = u.id
             ORDER BY b.id DESC
         `);

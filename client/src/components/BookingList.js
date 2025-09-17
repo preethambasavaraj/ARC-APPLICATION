@@ -41,7 +41,7 @@ const BookingList = ({ bookings, onEdit, onCancel, onReceipt }) => {
                         <td>{booking.payment_status}</td>
                         <td>{booking.status}</td>
                         <td>
-                            <button onClick={() => onReceipt(booking.id)}>Receipt</button>
+                            <button onClick={() => onReceipt(booking)}>Receipt</button>
                             {booking.status !== 'Cancelled' && (
                                 <>
                                     <button onClick={() => onEdit(booking)}>Edit Payment</button>
