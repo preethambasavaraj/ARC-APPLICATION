@@ -8,6 +8,7 @@ import Dashboard from './components/Dashboard';
 import Ledger from './components/Ledger';
 import Admin from './components/Admin';
 import Analytics from './components/Analytics';
+import Receipt from './components/Receipt';
 import './App.css';
 
 const ProtectedRoute = ({ user, allowedRoles, children }) => {
@@ -85,6 +86,7 @@ function App() {
                                 <Analytics />
                             </ProtectedRoute>
                         } />
+                        <Route path="/receipt/:bookingId" element={<Receipt />} />
                     </Routes>
                 </main>
             </div>

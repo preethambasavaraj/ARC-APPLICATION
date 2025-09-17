@@ -100,6 +100,10 @@ const Dashboard = ({ user }) => {
         }
     };
 
+    const handleReceiptClick = (bookingId) => {
+        window.open(`/receipt/${bookingId}`, '_blank');
+    };
+
     const timeSlots = Array.from({ length: 16 }, (_, i) => {
         const startHour = 6 + i;
         const endHour = startHour + 1;
@@ -186,6 +190,7 @@ const Dashboard = ({ user }) => {
                     bookings={bookings} 
                     onEdit={handleEditClick} 
                     onCancel={handleCancelClick} 
+                    onReceipt={handleReceiptClick}
                 />
             </div>
             {isModalOpen && (

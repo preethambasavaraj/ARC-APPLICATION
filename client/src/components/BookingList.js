@@ -1,6 +1,6 @@
 import React from 'react';
 
-const BookingList = ({ bookings, onEdit, onCancel }) => {
+const BookingList = ({ bookings, onEdit, onCancel, onReceipt }) => {
     const rowStyle = (booking) => {
         if (booking.status === 'Cancelled') {
             return { textDecoration: 'line-through', color: '#999' };
@@ -41,6 +41,7 @@ const BookingList = ({ bookings, onEdit, onCancel }) => {
                         <td>{booking.payment_status}</td>
                         <td>{booking.status}</td>
                         <td>
+                            <button onClick={() => onReceipt(booking.id)}>Receipt</button>
                             {booking.status !== 'Cancelled' && (
                                 <>
                                     <button onClick={() => onEdit(booking)}>Edit Payment</button>

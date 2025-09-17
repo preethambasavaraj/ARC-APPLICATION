@@ -1,0 +1,130 @@
+.receipt-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 2rem;
+    border: 1px solid #ccc;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.receipt-header {
+    text-align: center;
+    border-bottom: 2px dashed #ccc;
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
+}
+
+.receipt-header h1 {
+    margin: 0;
+    font-size: 2.5rem;
+    color: #333;
+}
+
+.receipt-header p {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #666;
+}
+
+.receipt-section {
+    margin-bottom: 2rem;
+}
+
+.receipt-section h2, .receipt-section h3 {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    color: #444;
+}
+
+.receipt-body p {
+    margin: 0.5rem 0;
+    font-size: 1.1rem;
+}
+
+.receipt-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 2px dashed #ccc;
+}
+
+.qr-code {
+    text-align: center;
+}
+
+.qr-code p {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.5rem;
+}
+
+.booking-info {
+    text-align: right;
+}
+
+.status {
+    padding: 3px 8px;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: bold;
+}
+
+.status.Completed, .status.Booked {
+    background-color: #28a745;
+}
+
+.status.Pending {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.status.Received {
+    background-color: #17a2b8;
+}
+
+.status.Cancelled {
+    background-color: #dc3545;
+}
+
+.receipt-actions {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+.receipt-actions button {
+    padding: 0.8rem 1.5rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+.receipt-actions button:hover {
+    background-color: #0056b3;
+}
+
+@media print {
+    body {
+        background-color: #fff;
+    }
+    .receipt-container {
+        box-shadow: none;
+        border: none;
+        margin: 0;
+        padding: 0;
+        max-width: 100%;
+    }
+    .receipt-actions {
+        display: none;
+    }
+    .receipt-footer {
+        page-break-inside: avoid;
+    }
+}

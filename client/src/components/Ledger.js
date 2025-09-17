@@ -60,6 +60,10 @@ const Ledger = () => {
         }
     };
 
+    const handleReceiptClick = (bookingId) => {
+        window.open(`/receipt/${bookingId}`, '_blank');
+    };
+
     return (
         <div>
             <h2>Booking Ledger</h2>
@@ -72,6 +76,7 @@ const Ledger = () => {
                 bookings={bookings} 
                 onEdit={handleEditClick} 
                 onCancel={handleCancelClick} 
+                onReceipt={handleReceiptClick}
             />
             {isModalOpen && (
                 <EditBookingModal 
