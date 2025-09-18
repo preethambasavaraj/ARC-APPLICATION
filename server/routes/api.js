@@ -118,7 +118,7 @@ router.get('/courts/availability', authenticateToken, async (req, res) => {
     }
 
     try {
-        const [courts] = await db.query('SELECT c.id, c.name, c.status, s.name as sport_name, s.price FROM courts c JOIN sports s ON c.sport_id = s.id');
+        const [courts] = await db.query('SELECT c.id, c.name, c.status, c.sport_id, s.name as sport_name, s.price FROM courts c JOIN sports s ON c.sport_id = s.id');
         const [bookings] = await db.query('SELECT court_id, time_slot FROM bookings WHERE date = ?', [date]);
 
         const toMinutes = (timeStr) => {
@@ -198,7 +198,7 @@ router.get('/bookings/all', authenticateToken, async (req, res) => {
                 b.*, 
                 c.name as court_name, 
                 s.name as sport_name,
-                s.price as total_amount,
+                b.total_price as total_amount,
                 u.username as created_by_user,
                 DATE_FORMAT(b.date, '%Y-%m-%d') as date
             FROM bookings b 
@@ -304,7 +304,7 @@ router.get('/booking/:id/receipt.pdf', async (req, res) => {
                 b.status as booking_status,
                 c.name as court_name,
                 s.name as sport_name,
-                s.price as total_amount,
+                b.total_price as total_amount,
                 u.username as created_by
             FROM bookings b
             JOIN courts c ON b.court_id = c.id
@@ -367,6 +367,46 @@ router.get('/booking/:id/receipt.pdf', async (req, res) => {
 });
 
 
+// Calculate price dynamically
+router.post('/bookings/calculate-price', authenticateToken, async (req, res) => {
+    const { sport_id, startTime, endTime } = req.body;
+
+    if (!sport_id || !startTime || !endTime) {
+        return res.status(400).json({ message: 'sport_id, startTime, and endTime are required.' });
+    }
+
+    try {
+        const [sports] = await db.query('SELECT price FROM sports WHERE id = ?', [sport_id]);
+        if (sports.length === 0) {
+            return res.status(404).json({ message: 'Sport not found' });
+        }
+        const hourly_price = sports[0].price;
+
+        const parseTime = (timeStr) => {
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours * 60 + minutes;
+        };
+        const durationInMinutes = parseTime(endTime) - parseTime(startTime);
+
+        if (durationInMinutes < 30) { // Only charge for 30 mins or more
+            return res.json({ total_price: 0 });
+        }
+
+        const num_of_hours = Math.floor(durationInMinutes / 60);
+        const remaining_minutes = durationInMinutes % 60;
+        
+        let total_price = num_of_hours * hourly_price;
+        if (remaining_minutes >= 30) {
+            total_price += hourly_price / 2;
+        }
+
+        res.json({ total_price });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Add a new booking
 router.post('/bookings', authenticateToken, async (req, res) => {
     const { court_id, customer_name, customer_contact, customer_email, date, startTime, endTime, payment_mode, amount_paid } = req.body;
@@ -383,8 +423,29 @@ router.post('/bookings', authenticateToken, async (req, res) => {
         if (sports.length === 0) {
             return res.status(404).json({ message: 'Sport not found' });
         }
-        const total_amount = sports[0].price;
-        const balance_amount = total_amount - amount_paid;
+        const hourly_price = sports[0].price;
+
+        // New duration-based pricing logic
+        const parseTime = (timeStr) => {
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours * 60 + minutes;
+        };
+        const durationInMinutes = parseTime(endTime) - parseTime(startTime);
+
+        if (durationInMinutes <= 0) {
+            return res.status(400).json({ message: 'End time must be after start time.' });
+        }
+
+        const num_of_hours = Math.floor(durationInMinutes / 60);
+        const remaining_minutes = durationInMinutes % 60;
+        
+        let total_price = num_of_hours * hourly_price;
+        if (remaining_minutes >= 30) {
+            total_price += hourly_price / 2;
+        }
+        // End of new pricing logic
+
+        const balance_amount = total_price - amount_paid;
 
         let payment_status = 'Pending';
         if (amount_paid > 0) {
@@ -428,8 +489,8 @@ router.post('/bookings', authenticateToken, async (req, res) => {
         };
 
         const time_slot = `${formatTo12Hour(startTime)} - ${formatTo12Hour(endTime)}`;
-        const sql = 'INSERT INTO bookings (court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid, balance_amount, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
-        const values = [court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid, balance_amount, payment_status];
+        const sql = 'INSERT INTO bookings (court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid, total_price, balance_amount, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+        const values = [court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid, total_price, balance_amount, payment_status];
 
         const [result] = await db.query(sql, values);
         res.json({ success: true, bookingId: result.insertId });
@@ -444,20 +505,14 @@ router.put('/bookings/:id/payment', authenticateToken, async (req, res) => {
     const { amount_paid, payment_status } = req.body;
 
     try {
-        // First, get the full price of the booking's sport
-        const [bookings] = await db.query('SELECT sport_id FROM bookings WHERE id = ?', [id]);
+        // First, get the total_price directly from the booking
+        const [bookings] = await db.query('SELECT total_price FROM bookings WHERE id = ?', [id]);
         if (bookings.length === 0) {
             return res.status(404).json({ message: 'Booking not found' });
         }
-        const sport_id = bookings[0].sport_id;
+        const total_price = bookings[0].total_price;
 
-        const [sports] = await db.query('SELECT price FROM sports WHERE id = ?', [sport_id]);
-        if (sports.length === 0) {
-            return res.status(404).json({ message: 'Sport not found for this booking' });
-        }
-        const total_amount = sports[0].price;
-
-        const new_balance = total_amount - amount_paid;
+        const new_balance = total_price - amount_paid;
 
         await db.query(
             'UPDATE bookings SET amount_paid = ?, balance_amount = ?, payment_status = ? WHERE id = ?',
