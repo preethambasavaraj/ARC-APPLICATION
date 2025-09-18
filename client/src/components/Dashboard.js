@@ -30,9 +30,10 @@ const Dashboard = ({ user }) => {
                         endTime: endTime 
                     } 
                 });
-                setAvailability(res.data);
+                setAvailability(Array.isArray(res.data) ? res.data : []);
             } catch (error) {
                 console.error("Error fetching availability:", error);
+                setAvailability([]);
             }
         }
     }, [selectedDate, startTime, endTime]);

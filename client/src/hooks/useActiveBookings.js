@@ -27,9 +27,10 @@ export const useActiveBookings = () => {
     const fetchActiveBookings = useCallback(async () => {
         try {
             const res = await api.get(`/bookings/active`);
-            setActiveBookings(res.data);
+            setActiveBookings(Array.isArray(res.data) ? res.data : []);
         } catch (error) {
             console.error("Error fetching active bookings:", error);
+            setActiveBookings([]);
         }
     }, []);
 
@@ -49,6 +50,9 @@ export const useActiveBookings = () => {
     }, []);
 
     const visibleBookings = useMemo(() => {
+        if (!Array.isArray(activeBookings)) {
+            return [];
+        }
         return activeBookings.filter(booking => !clearedBookingIds.has(booking.id));
     }, [activeBookings, clearedBookingIds]);
 
