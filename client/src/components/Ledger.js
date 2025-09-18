@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../api';
 import BookingList from './BookingList';
 import EditBookingModal from './EditBookingModal';
@@ -7,6 +7,7 @@ import ReceiptModal from './ReceiptModal';
 const Ledger = () => {
     const [bookings, setBookings] = useState([]);
     const [filters, setFilters] = useState({ date: '', sport: '', customer: '' });
+    const [sortOrder, setSortOrder] = useState('desc'); // 'desc' for newest first
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState(null);
@@ -17,9 +18,10 @@ const Ledger = () => {
             const res = await api.get('/bookings/all', {
                 params: { date, sport, customer }
             });
-            setBookings(res.data);
+            setBookings(Array.isArray(res.data) ? res.data : []);
         } catch (error) {
             console.error("Error fetching bookings:", error);
+            setBookings([]);
         }
     }, [filters]);
 
@@ -30,6 +32,20 @@ const Ledger = () => {
     const handleFilterChange = (e) => {
         setFilters({ ...filters, [e.target.name]: e.target.value });
     }
+
+    const toggleSortOrder = () => {
+        setSortOrder(currentOrder => currentOrder === 'desc' ? 'asc' : 'desc');
+    };
+
+    const sortedBookings = useMemo(() => {
+        return [...bookings].sort((a, b) => {
+            if (sortOrder === 'desc') {
+                return b.id - a.id; // Higher IDs are newer
+            } else {
+                return a.id - b.id;
+            }
+        });
+    }, [bookings, sortOrder]);
 
     const handleEditClick = (booking) => {
         setSelectedBooking(booking);
@@ -71,13 +87,16 @@ const Ledger = () => {
     return (
         <div>
             <h2>Booking Ledger</h2>
-            <div>
+            <div style={{ marginBottom: '10px' }}>
                 <input type="date" name="date" value={filters.date} onChange={handleFilterChange} />
-                <input type="text" name="sport" placeholder="Filter by sport" value={filters.sport} onChange={handleFilterChange} />
-                <input type="text" name="customer" placeholder="Filter by customer" value={filters.customer} onChange={handleFilterChange} />
+                <input type="text" name="sport" placeholder="Filter by sport" value={filters.sport} onChange={handleFilterChange} style={{ marginLeft: '10px' }} />
+                <input type="text" name="customer" placeholder="Filter by customer" value={filters.customer} onChange={handleFilterChange} style={{ marginLeft: '10px' }} />
+                <button onClick={toggleSortOrder} style={{ marginLeft: '10px' }}>
+                    Sort: {sortOrder === 'desc' ? 'Newest First' : 'Oldest First'}
+                </button>
             </div>
             <BookingList 
-                bookings={bookings} 
+                bookings={sortedBookings} 
                 onEdit={handleEditClick} 
                 onCancel={handleCancelClick} 
                 onReceipt={handleReceiptClick}
