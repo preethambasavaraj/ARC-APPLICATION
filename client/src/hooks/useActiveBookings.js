@@ -3,11 +3,11 @@ import api from '../api';
 
 const getClearedIdsFromStorage = () => {
     try {
-        const item = sessionStorage.getItem('clearedBookingIds');
+        const item = localStorage.getItem('clearedBookingIds');
         const ids = item ? JSON.parse(item) : [];
         return new Set(ids);
     } catch (error) {
-        console.error("Error reading from sessionStorage:", error);
+        console.error("Error reading from localStorage:", error);
         return new Set();
     }
 };
@@ -18,9 +18,9 @@ export const useActiveBookings = () => {
 
     useEffect(() => {
         try {
-            sessionStorage.setItem('clearedBookingIds', JSON.stringify([...clearedBookingIds]));
+            localStorage.setItem('clearedBookingIds', JSON.stringify([...clearedBookingIds]));
         } catch (error) {
-            console.error("Error writing to sessionStorage:", error);
+            console.error("Error writing to localStorage:", error);
         }
     }, [clearedBookingIds]);
 
