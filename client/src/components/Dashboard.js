@@ -4,6 +4,7 @@ import BookingForm from './BookingForm';
 import BookingList from './BookingList';
 import ActiveBookings from './ActiveBookings';
 import EditBookingModal from './EditBookingModal';
+import ReceiptModal from './ReceiptModal';
 import { useActiveBookings } from '../hooks/useActiveBookings';
 import './ActiveBookings.css';
 
@@ -15,7 +16,8 @@ const Dashboard = ({ user }) => {
     const [availability, setAvailability] = useState([]);
     const { bookings: activeBookings, removeBooking: handleRemoveEndedBooking } = useActiveBookings();
 
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState(null);
 
     const fetchAvailability = useCallback(async () => {
@@ -28,9 +30,10 @@ const Dashboard = ({ user }) => {
                         endTime: endTime 
                     } 
                 });
-                setAvailability(res.data);
+                setAvailability(Array.isArray(res.data) ? res.data : []);
             } catch (error) {
                 console.error("Error fetching availability:", error);
+                setAvailability([]);
             }
         }
     }, [selectedDate, startTime, endTime]);
@@ -71,11 +74,17 @@ const Dashboard = ({ user }) => {
 
     const handleEditClick = (booking) => {
         setSelectedBooking(booking);
-        setIsModalOpen(true);
+        setIsEditModalOpen(true);
+    };
+
+    const handleReceiptClick = (booking) => {
+        setSelectedBooking(booking);
+        setIsReceiptModalOpen(true);
     };
 
     const handleCloseModal = () => {
-        setIsModalOpen(false);
+        setIsEditModalOpen(false);
+        setIsReceiptModalOpen(false);
         setSelectedBooking(null);
     };
 
@@ -186,12 +195,19 @@ const Dashboard = ({ user }) => {
                     bookings={bookings} 
                     onEdit={handleEditClick} 
                     onCancel={handleCancelClick} 
+                    onReceipt={handleReceiptClick}
                 />
             </div>
-            {isModalOpen && (
+            {isEditModalOpen && (
                 <EditBookingModal 
                     booking={selectedBooking}
                     onSave={handleSavePayment}
+                    onClose={handleCloseModal}
+                />
+            )}
+            {isReceiptModalOpen && (
+                <ReceiptModal 
+                    booking={selectedBooking}
                     onClose={handleCloseModal}
                 />
             )}

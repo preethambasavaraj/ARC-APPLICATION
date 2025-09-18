@@ -4,6 +4,7 @@ const db = require('../database');
 const twilio = require('twilio');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const PDFDocument = require('pdfkit');
 
 const saltRounds = 10;
 const JWT_SECRET = process.env.JWT_SECRET || 'your_default_secret_key'; // Use environment variable for secret
@@ -202,7 +203,7 @@ router.get('/bookings/all', authenticateToken, async (req, res) => {
                 DATE_FORMAT(b.date, '%Y-%m-%d') as date
             FROM bookings b 
             JOIN courts c ON b.court_id = c.id
-            JOIN sports s ON c.sport_id = s.id
+            JOIN sports s ON b.sport_id = s.id
             LEFT JOIN users u ON b.created_by_user_id = u.id
         `;
 
@@ -285,6 +286,86 @@ router.get('/bookings/active', authenticateToken, async (req, res) => {
     }
 });
 
+// Generate PDF receipt
+router.get('/booking/:id/receipt.pdf', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const query = `
+            SELECT 
+                b.id as booking_id,
+                b.customer_name,
+                b.customer_contact,
+                DATE_FORMAT(b.date, '%Y-%m-%d') as date,
+                b.time_slot,
+                b.payment_mode,
+                b.amount_paid,
+                b.balance_amount,
+                b.payment_status,
+                b.status as booking_status,
+                c.name as court_name,
+                s.name as sport_name,
+                s.price as total_amount,
+                u.username as created_by
+            FROM bookings b
+            JOIN courts c ON b.court_id = c.id
+            JOIN sports s ON b.sport_id = s.id
+            LEFT JOIN users u ON b.created_by_user_id = u.id
+            WHERE b.id = ?
+        `;
+        const [rows] = await db.query(query, [id]);
+        if (rows.length === 0) {
+            return res.status(404).send('Booking not found');
+        }
+        const booking = rows[0];
+
+        const doc = new PDFDocument({ size: 'A4', margin: 50 });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="receipt-${booking.booking_id}.pdf"`);
+
+        doc.pipe(res);
+
+        // Header
+        doc.fontSize(20).text('ARC SportsZone Booking Receipt', { align: 'center' });
+        doc.moveDown();
+
+        // Booking Details
+        doc.fontSize(12).text(`Booking ID: ${booking.booking_id}`);
+        doc.text(`Date: ${booking.date}`);
+        doc.text(`Time: ${booking.time_slot}`);
+        doc.moveDown();
+
+        // Customer Details
+        doc.fontSize(14).text('Customer Details', { underline: true });
+        doc.fontSize(12).text(`Name: ${booking.customer_name}`);
+        doc.text(`Contact: ${booking.customer_contact}`);
+        doc.moveDown();
+        
+        // Booking Info
+        doc.fontSize(14).text('Booking Information', { underline: true });
+        doc.fontSize(12).text(`Sport: ${booking.sport_name}`);
+        doc.text(`Court: ${booking.court_name}`);
+        doc.moveDown();
+
+        // Payment Details
+        doc.fontSize(14).text('Payment Details', { underline: true });
+        doc.fontSize(12).text(`Total Amount: Rs. ${booking.total_amount}`);
+        doc.text(`Amount Paid: Rs. ${booking.amount_paid}`);
+        doc.font('Helvetica-Bold').text(`Balance: Rs. ${booking.balance_amount}`);
+        doc.font('Helvetica').text(`Payment Status: ${booking.payment_status}`);
+        doc.moveDown();
+
+        // Footer
+        doc.fontSize(10).text('Thank you for your booking!', { align: 'center' });
+
+        doc.end();
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error generating PDF');
+    }
+});
+
 
 // Add a new booking
 router.post('/bookings', authenticateToken, async (req, res) => {
@@ -310,7 +391,7 @@ router.post('/bookings', authenticateToken, async (req, res) => {
             payment_status = balance_amount <= 0 ? 'Completed' : 'Received';
         }
 
-        const [existingBookings] = await db.query('SELECT time_slot FROM bookings WHERE court_id = ? AND date = ? AND status != \'Cancelled\'', [court_id, date]);
+        const [existingBookings] = await db.query('SELECT time_slot FROM bookings WHERE court_id = ? AND date = ? AND status != ?', [court_id, date, 'Cancelled']);
         
         const toMinutes = (timeStr) => {
             const [time, modifier] = timeStr.split(' ');
@@ -480,9 +561,9 @@ router.delete('/sports/:id', authenticateToken, isAdmin, async (req, res) => {
 // Analytics: Summary
 router.get('/analytics/summary', authenticateToken, isAdmin, async (req, res) => {
     try {
-        const [[{ total_bookings }]] = await db.query('SELECT COUNT(*) as total_bookings FROM bookings WHERE status != \'Cancelled\'');
-        const [[{ total_revenue }]] = await db.query('SELECT SUM(amount_paid) as total_revenue FROM bookings WHERE status != \'Cancelled\'');
-        const [[{ total_cancellations }]] = await db.query('SELECT COUNT(*) as total_cancellations FROM bookings WHERE status = \'Cancelled\'');
+        const [[{ total_bookings }]] = await db.query('SELECT COUNT(*) as total_bookings FROM bookings WHERE status != ?', ['Cancelled']);
+        const [[{ total_revenue }]] = await db.query('SELECT SUM(amount_paid) as total_revenue FROM bookings WHERE status != ?', ['Cancelled']);
+        const [[{ total_cancellations }]] = await db.query('SELECT COUNT(*) as total_cancellations FROM bookings WHERE status = ?', ['Cancelled']);
         const [[{ total_sports }]] = await db.query('SELECT COUNT(*) as total_sports FROM sports');
         const [[{ total_courts }]] = await db.query('SELECT COUNT(*) as total_courts FROM courts');
 
@@ -520,10 +601,10 @@ router.get('/analytics/revenue-by-sport', authenticateToken, isAdmin, async (req
             SELECT s.name, SUM(b.amount_paid) as revenue
             FROM bookings b
             JOIN sports s ON b.sport_id = s.id
-            WHERE b.status != 'Cancelled'
+            WHERE b.status != ?
             GROUP BY s.name
             ORDER BY revenue DESC
-        `);
+        `, ['Cancelled']);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -551,7 +632,7 @@ router.get('/ledger/download', authenticateToken, async (req, res) => {
                 u.username as created_by
             FROM bookings b
             JOIN courts c ON b.court_id = c.id
-            JOIN sports s ON c.sport_id = s.id
+            JOIN sports s ON b.sport_id = s.id
             LEFT JOIN users u ON b.created_by_user_id = u.id
             ORDER BY b.id DESC
         `);
@@ -650,8 +731,8 @@ router.post('/whatsapp', async (req, res) => {
                 const time_slot_12hr = `${formatTo12Hour(session.startTime)} - ${formatTo12Hour(session.endTime)}`;
 
                 const [availableCourts] = await db.query(
-                    'SELECT c.id, c.name FROM courts c LEFT JOIN bookings b ON c.id = b.court_id AND b.date = ? AND b.time_slot = ? WHERE c.sport_id = ? AND c.status = \"Available\" AND b.id IS NULL',
-                    [session.date, time_slot_12hr, session.sport_id]
+                    'SELECT c.id, c.name FROM courts c LEFT JOIN bookings b ON c.id = b.court_id AND b.date = ? AND b.time_slot = ? WHERE c.sport_id = ? AND c.status = ? AND b.id IS NULL',
+                    [session.date, time_slot_12hr, session.sport_id, 'Available']
                 );
 
                 if (availableCourts.length > 0) {
