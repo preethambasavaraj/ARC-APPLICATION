@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api';
 
 const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSuccess, user }) => {
@@ -15,27 +15,42 @@ const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSucces
     useEffect(() => {
         // When available courts change, reset the form
         setCourtId('');
-        setAmountPaid(0);
-        setTotalPrice(0);
-        setBalance(0);
     }, [courts]);
 
+    // Debounced effect for calculating price
     useEffect(() => {
-        // When a court is selected, auto-fill the price and calculate balance
-        if (courtId) {
-            const selectedCourt = courts.find(c => c.id === parseInt(courtId));
-            if (selectedCourt) {
-                const price = selectedCourt.price || 0;
-                setTotalPrice(price);
-                setAmountPaid(price); // Default to full amount paid
-                setBalance(0);
+        const calculatePrice = async () => {
+            if (courtId && startTime && endTime) {
+                const selectedCourt = courts.find(c => c.id === parseInt(courtId));
+                if (!selectedCourt) return;
+
+                try {
+                    const res = await api.post('/bookings/calculate-price', {
+                        sport_id: selectedCourt.sport_id,
+                        startTime,
+                        endTime
+                    });
+                    const newTotalPrice = res.data.total_price || 0;
+                    setTotalPrice(newTotalPrice);
+                    setAmountPaid(newTotalPrice); // Default to full amount paid
+                    setBalance(0);
+                } catch (error) {
+                    console.error("Error calculating price:", error);
+                    setTotalPrice(0);
+                    setAmountPaid(0);
+                    setBalance(0);
+                }
             }
-        } else {
-            setTotalPrice(0);
-            setAmountPaid(0);
-            setBalance(0);
-        }
-    }, [courtId, courts]);
+        };
+
+        const handler = setTimeout(() => {
+            calculatePrice();
+        }, 300); // 300ms debounce
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [courtId, startTime, endTime, courts]);
 
     const handleAmountPaidChange = (e) => {
         const newAmountPaid = parseFloat(e.target.value) || 0;
@@ -47,6 +62,10 @@ const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSucces
         e.preventDefault();
         if (!courtId) {
             setMessage('Please select a court.');
+            return;
+        }
+        if (totalPrice <= 0) {
+            setMessage('Cannot create a booking with zero or negative price. Please check the times.');
             return;
         }
         try {
@@ -86,7 +105,7 @@ const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSucces
                 <select value={courtId} onChange={(e) => setCourtId(e.target.value)} required>
                     <option value="">Select an Available Court</option>
                     {courts.map(court => (
-                        <option key={court.id} value={court.id}>{court.name} ({court.sport_name}) - ₹{court.price}</option>
+                        <option key={court.id} value={court.id}>{court.name} ({court.sport_name})</option>
                     ))}
                 </select>
             </div>
@@ -102,6 +121,12 @@ const BookingForm = ({ courts, selectedDate, startTime, endTime, onBookingSucces
                 <label>Customer Email (Optional)</label>
                 <input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
             </div>
+            
+            <div>
+                <label>Total Price</label>
+                <input type="number" value={totalPrice} readOnly style={{ backgroundColor: '#f0f0f0' }} />
+            </div>
+
             <div>
                 <label>Payment Mode</label>
                 <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} required>
