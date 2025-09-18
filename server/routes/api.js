@@ -653,7 +653,7 @@ router.get('/analytics/bookings-over-time', authenticateToken, isAdmin, async (r
 router.get('/analytics/revenue-by-sport', authenticateToken, isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(`
-            SELECT s.name, SUM(b.total_price) as revenue
+            SELECT s.name, SUM(CASE WHEN b.total_price > 0 THEN b.total_price ELSE s.price END) as revenue
             FROM bookings b
             JOIN sports s ON b.sport_id = s.id
             WHERE b.status != ?
