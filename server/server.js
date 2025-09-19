@@ -10,7 +10,8 @@ const PORT = process.env.PORT || 5000;
 
 const whitelist = [
   'http://localhost:3000',
-  'https://894362bbe422.ngrok-free.app'
+  'https://894362bbe422.ngrok-free.app',
+  'https://arc-application-beta.vercel.app'
 ];
 
 const corsOptions = {
