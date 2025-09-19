@@ -653,13 +653,37 @@ router.get('/analytics/bookings-over-time', authenticateToken, isAdmin, async (r
 router.get('/analytics/revenue-by-sport', authenticateToken, isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(`
-            SELECT s.name, SUM(b.amount_paid) as revenue
+            SELECT s.name, SUM(CASE WHEN b.total_price > 0 THEN b.total_price ELSE s.price END) as revenue
             FROM bookings b
             JOIN sports s ON b.sport_id = s.id
             WHERE b.status != ?
             GROUP BY s.name
             ORDER BY revenue DESC
         `, ['Cancelled']);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Analytics: Court Utilization Heatmap
+router.get('/analytics/utilization-heatmap', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT 
+                DAYNAME(date) as day_of_week,
+                HOUR(STR_TO_DATE(SUBSTRING_INDEX(time_slot, ' - ', 1), '%h:%i %p')) as hour_of_day,
+                COUNT(*) as booking_count
+            FROM 
+                bookings
+            WHERE
+                status != 'Cancelled'
+            GROUP BY 
+                day_of_week, hour_of_day
+            ORDER BY
+                FIELD(day_of_week, 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'),
+                hour_of_day;
+        `);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });

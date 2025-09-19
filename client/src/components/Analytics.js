@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { Line, Pie } from 'react-chartjs-2';
+import { Line, Pie, Bar } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
     CategoryScale,
     LinearScale,
     PointElement,
     LineElement,
+    BarElement,
     ArcElement,
     Tooltip,
     Legend,
@@ -18,6 +19,7 @@ ChartJS.register(
     LinearScale,
     PointElement,
     LineElement,
+    BarElement,
     ArcElement,
     Tooltip,
     Legend
@@ -27,6 +29,7 @@ const Analytics = () => {
     const [summary, setSummary] = useState({});
     const [bookingsOverTime, setBookingsOverTime] = useState({});
     const [revenueBySport, setRevenueBySport] = useState({});
+    const [utilizationData, setUtilizationData] = useState({});
 
     useEffect(() => {
         const fetchAnalyticsData = async () => {
@@ -70,6 +73,26 @@ const Analytics = () => {
                         ],
                         borderWidth: 1
                     }]
+                });
+
+                const utilizationRes = await api.get('/analytics/utilization-heatmap');
+                const hours = Array.from({ length: 17 }, (_, i) => i + 6); // 6 AM to 10 PM
+                const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const datasets = days.map((day, index) => {
+                    const dayData = utilizationRes.data.filter(d => d.day_of_week === day);
+                    return {
+                        label: day,
+                        data: hours.map(hour => {
+                            const hourData = dayData.find(d => d.hour_of_day === hour);
+                            return hourData ? hourData.booking_count : 0;
+                        }),
+                        backgroundColor: `rgba(${50 + index * 30}, ${150 - index * 10}, ${200}, 0.5)`
+                    };
+                });
+
+                setUtilizationData({
+                    labels: hours.map(h => `${h % 12 === 0 ? 12 : h % 12}:00 ${h < 12 || h === 24 ? 'AM' : 'PM'}`),
+                    datasets: datasets
                 });
 
             } catch (error) {
@@ -136,6 +159,10 @@ const Analytics = () => {
                 <div className="chart-card">
                     <h3>Revenue by Sport</h3>
                     {revenueBySport.labels && <Pie data={revenueBySport} />}
+                </div>
+                <div className="chart-card full-width">
+                    <h3>Court Utilization by Day and Hour</h3>
+                    {utilizationData.labels && <Bar data={utilizationData} options={{ scales: { x: { stacked: true }, y: { stacked: true } } }} />}
                 </div>
             </div>
         </div>
