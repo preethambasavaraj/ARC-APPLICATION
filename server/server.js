@@ -14,6 +14,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 
 app.use('/api', apiRoutes);
 
+console.log("About to start server...");
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`✅ Server is running on port ${PORT}`);
 });
