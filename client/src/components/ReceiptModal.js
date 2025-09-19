@@ -8,7 +8,7 @@ const ReceiptModal = ({ booking, onClose }) => {
     }
 
     // IMPORTANT: Replace with your actual public server URL in a real deployment
-    const publicServerUrl = 'arc-application-production.up.railway.app'; 
+    const publicServerUrl = 'process.env.REACT_APP_RECIEPT_URL' || 'http://localhost:5000'; 
     const receiptPdfUrl = `${publicServerUrl}/api/booking/${booking.id}/receipt.pdf`;
 
     const handlePrint = () => {
