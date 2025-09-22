@@ -11,6 +11,7 @@ import {
     ArcElement,
     Tooltip,
     Legend,
+    Title,
 } from 'chart.js';
 import './Analytics.css';
 
@@ -22,7 +23,8 @@ ChartJS.register(
     BarElement,
     ArcElement,
     Tooltip,
-    Legend
+    Legend,
+    Title
 );
 
 const Analytics = () => {
@@ -30,13 +32,18 @@ const Analytics = () => {
     const [bookingsOverTime, setBookingsOverTime] = useState({});
     const [revenueBySport, setRevenueBySport] = useState({});
     const [utilizationData, setUtilizationData] = useState({});
+    const [bookingStatusData, setBookingStatusData] = useState({});
+    const [courtPopularityData, setCourtPopularityData] = useState({});
+    const [staffPerformanceData, setStaffPerformanceData] = useState({});
 
     useEffect(() => {
         const fetchAnalyticsData = async () => {
             try {
+                // Summary Cards
                 const summaryRes = await api.get('/analytics/summary');
                 setSummary(summaryRes.data);
 
+                // Bookings Over Time
                 const bookingsOverTimeRes = await api.get('/analytics/bookings-over-time');
                 setBookingsOverTime({
                     labels: bookingsOverTimeRes.data.map(d => new Date(d.date).toLocaleDateString()),
@@ -49,6 +56,7 @@ const Analytics = () => {
                     }]
                 });
 
+                // Revenue by Sport
                 const revenueBySportRes = await api.get('/analytics/revenue-by-sport');
                 setRevenueBySport({
                     labels: revenueBySportRes.data.map(d => d.name),
@@ -56,12 +64,12 @@ const Analytics = () => {
                         label: 'Revenue',
                         data: revenueBySportRes.data.map(d => d.revenue),
                         backgroundColor: [
-                            'rgba(255, 99, 132, 0.2)',
-                            'rgba(54, 162, 235, 0.2)',
-                            'rgba(255, 206, 86, 0.2)',
-                            'rgba(75, 192, 192, 0.2)',
-                            'rgba(153, 102, 255, 0.2)',
-                            'rgba(255, 159, 64, 0.2)'
+                            'rgba(255, 99, 132, 0.3)',
+                            'rgba(54, 162, 235, 0.3)',
+                            'rgba(255, 206, 86, 0.3)',
+                            'rgba(75, 192, 192, 0.3)',
+                            'rgba(153, 102, 255, 0.3)',
+                            'rgba(255, 159, 64, 0.3)'
                         ],
                         borderColor: [
                             'rgba(255, 99, 132, 1)',
@@ -75,6 +83,7 @@ const Analytics = () => {
                     }]
                 });
 
+                // Court Utilization
                 const utilizationRes = await api.get('/analytics/utilization-heatmap');
                 const hours = Array.from({ length: 17 }, (_, i) => i + 6); // 6 AM to 10 PM
                 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -86,13 +95,62 @@ const Analytics = () => {
                             const hourData = dayData.find(d => d.hour_of_day === hour);
                             return hourData ? hourData.booking_count : 0;
                         }),
-                        backgroundColor: `rgba(${50 + index * 30}, ${150 - index * 10}, ${200}, 0.5)`
+                        backgroundColor: `rgba(${50 + index * 25}, ${180 - index * 15}, ${220 - index * 5}, 0.6)`
                     };
                 });
 
                 setUtilizationData({
                     labels: hours.map(h => `${h % 12 === 0 ? 12 : h % 12}:00 ${h < 12 || h === 24 ? 'AM' : 'PM'}`),
                     datasets: datasets
+                });
+
+                // Booking Status Distribution
+                const statusRes = await api.get('/analytics/booking-status-distribution');
+                setBookingStatusData({
+                    labels: statusRes.data.map(d => d.status),
+                    datasets: [{
+                        label: 'Booking Status',
+                        data: statusRes.data.map(d => d.count),
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.5)', // Confirmed
+                            'rgba(54, 162, 235, 0.5)', // Completed
+                            'rgba(255, 99, 132, 0.5)', // Cancelled
+                            'rgba(255, 206, 86, 0.5)', // Pending
+                        ],
+                        borderColor: [
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(255, 206, 86, 1)',
+                        ],
+                        borderWidth: 1
+                    }]
+                });
+
+                // Court Popularity
+                const courtPopRes = await api.get('/analytics/court-popularity');
+                setCourtPopularityData({
+                    labels: courtPopRes.data.map(d => d.name),
+                    datasets: [{
+                        label: 'Number of Bookings',
+                        data: courtPopRes.data.map(d => d.booking_count),
+                        backgroundColor: 'rgba(153, 102, 255, 0.5)',
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        borderWidth: 1
+                    }]
+                });
+
+                // Staff Performance
+                const staffPerfRes = await api.get('/analytics/staff-performance');
+                setStaffPerformanceData({
+                    labels: staffPerfRes.data.map(d => d.username),
+                    datasets: [{
+                        label: 'Bookings Created',
+                        data: staffPerfRes.data.map(d => d.booking_count),
+                        backgroundColor: 'rgba(255, 159, 64, 0.5)',
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        borderWidth: 1
+                    }]
                 });
 
             } catch (error) {
@@ -160,9 +218,37 @@ const Analytics = () => {
                     <h3>Revenue by Sport</h3>
                     {revenueBySport.labels && <Pie data={revenueBySport} />}
                 </div>
-                <div className="chart-card full-width">
+
+                <div className="chart-card">
+                    <h3>Booking Status</h3>
+                    {bookingStatusData.labels && <Pie data={bookingStatusData} options={{ plugins: { legend: { position: 'top' } } }} />}
+                </div>
+                <div className="chart-card">
+                    <h3>Court Popularity</h3>
+                    {courtPopularityData.labels && <Bar data={courtPopularityData} options={{ 
+                        indexAxis: 'y', 
+                        responsive: true, 
+                        plugins: { 
+                            legend: { display: false }, 
+                            title: { display: true, text: 'Bookings per Court' } 
+                        }
+                    }} />}
+                </div>
+
+                <div className="chart-card">
+                    <h3>Staff Performance</h3>
+                    {staffPerformanceData.labels && <Bar data={staffPerformanceData} options={{ 
+                        responsive: true, 
+                        plugins: { 
+                            legend: { display: false }, 
+                            title: { display: true, text: 'Bookings Created per Staff Member' } 
+                        }
+                    }} />}
+                </div>
+
+                <div className="chart-card">
                     <h3>Court Utilization by Day and Hour</h3>
-                    {utilizationData.labels && <Bar data={utilizationData} options={{ scales: { x: { stacked: true }, y: { stacked: true } } }} />}
+                    {utilizationData.labels && <Bar data={utilizationData} options={{ responsive: true, plugins: { title: { display: true, text: 'Hourly Bookings Throughout the Week' } }, scales: { x: { stacked: true }, y: { stacked: true } } }} />}
                 </div>
             </div>
         </div>

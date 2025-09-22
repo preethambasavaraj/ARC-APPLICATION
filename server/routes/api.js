@@ -690,6 +690,54 @@ router.get('/analytics/utilization-heatmap', authenticateToken, isAdmin, async (
     }
 });
 
+// Analytics: Booking Status Distribution
+router.get('/analytics/booking-status-distribution', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT status, COUNT(*) as count 
+            FROM bookings 
+            GROUP BY status
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Analytics: Court Popularity
+router.get('/analytics/court-popularity', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT c.name, COUNT(b.id) as booking_count 
+            FROM bookings b
+            JOIN courts c ON b.court_id = c.id
+            WHERE b.status != 'Cancelled'
+            GROUP BY c.name 
+            ORDER BY booking_count DESC
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Analytics: Staff Performance
+router.get('/analytics/staff-performance', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT u.username, COUNT(b.id) as booking_count
+            FROM bookings b
+            JOIN users u ON b.created_by_user_id = u.id
+            WHERE b.status != 'Cancelled'
+            GROUP BY u.username
+            ORDER BY booking_count DESC
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Ledger Download
 router.get('/ledger/download', authenticateToken, async (req, res) => {
     try {
