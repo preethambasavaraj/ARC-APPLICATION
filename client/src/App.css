@@ -46,8 +46,15 @@ form {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    max-width: 400px;
     margin-bottom: 20px;
+    width: 100%; /* Default to full width */
+}
+
+/* Constrain form width on larger screens */
+@media (min-width: 600px) {
+    form {
+        max-width: 400px;
+    }
 }
 
 form div {
@@ -76,6 +83,52 @@ th, td {
     text-align: left;
 }
 
+.table-container {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 th {
     background-color: #f2f2f2;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .App {
+        padding: 10px;
+    }
+
+    table {
+        display: block;
+    }
+
+    header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    header nav {
+        margin-top: 10px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    header nav a {
+        margin: 5px 0;
+        padding: 10px;
+        background: #444;
+        border-radius: 5px;
+        width: calc(100% - 20px);
+        text-align: center;
+    }
+
+    header nav button {
+        width: 100%;
+        margin-top: 5px;
+        text-align: center;
+    }
 }

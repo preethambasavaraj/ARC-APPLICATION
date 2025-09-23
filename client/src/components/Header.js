@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 const Header = ({ user, onLogout }) => {
     return (
         <header>
-            <h1>SportsZone Booking</h1>
+            <h1>ARC SportZone Booking</h1>
             <nav>
                 {user && (
                     <>
