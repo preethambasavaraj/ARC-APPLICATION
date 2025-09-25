@@ -26,7 +26,6 @@ export const useActiveBookings = () => {
 
     const fetchAllBookings = useCallback(async () => {
         try {
-            // Fetch all bookings instead of just active ones
             const res = await api.get(`/bookings/all`);
             setAllBookings(Array.isArray(res.data) ? res.data : []);
         } catch (error) {
@@ -49,6 +48,23 @@ export const useActiveBookings = () => {
             return newSet;
         });
     }, []);
+
+    const markAsCompletedAndClear = useCallback(async (booking) => {
+        try {
+            // Step 1: Update the backend
+            await api.put(`/bookings/${booking.id}/payment`, {
+                amount_paid: booking.total_price, // Assume full payment is made
+                payment_status: 'Completed'
+            });
+            // Step 2: Clear from the UI
+            removeBooking(booking.id);
+            // Optional: Force a refetch to ensure all data is fresh
+            fetchAllBookings();
+        } catch (error) {
+            console.error("Error marking booking as completed:", error);
+            // Optionally, show an error to the user
+        }
+    }, [removeBooking, fetchAllBookings]);
 
     const categorizedBookings = useMemo(() => {
         if (!Array.isArray(allBookings)) {
@@ -105,5 +121,5 @@ export const useActiveBookings = () => {
 
     }, [allBookings, clearedBookingIds]);
 
-    return { ...categorizedBookings, removeBooking };
+    return { ...categorizedBookings, removeBooking, markAsCompletedAndClear };
 };

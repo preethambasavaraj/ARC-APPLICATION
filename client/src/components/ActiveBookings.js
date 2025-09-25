@@ -4,7 +4,7 @@ import BookingDetailsModal from './BookingDetailsModal';
 import './ActiveBookings.css';
 
 const ActiveBookings = () => {
-    const { inProgress, upcoming, removeBooking } = useActiveBookings();
+    const { inProgress, upcoming, removeBooking, markAsCompletedAndClear } = useActiveBookings();
     const [selectedBooking, setSelectedBooking] = useState(null);
 
     const handleCardClick = (booking) => {
@@ -15,30 +15,51 @@ const ActiveBookings = () => {
         setSelectedBooking(null);
     };
 
-    const BookingCard = ({ booking, onCardClick, onClear, showClear }) => (
-        <div className={`active-booking-card ${booking.status}`} onClick={() => onCardClick(booking)}>
-            <div className="booking-info">
-                <span className="sport-name">{booking.sport_name}</span>
-                <span className="court-name">{booking.court_name}</span>
-            </div>
-            <div className="booking-time">{booking.time_slot}</div>
-            <div className="customer-name">{booking.customer_name}</div>
-            {showClear && booking.status === 'ended' && (
-                <div className="ended-message">
-                    Time has ended, inform customer.
-                    <button 
-                        onClick={(e) => { 
-                            e.stopPropagation(); // Prevent modal from opening
-                            onClear(booking.id); 
-                        }} 
-                        className="clear-btn"
-                    >
-                        Clear
-                    </button>
+    const BookingCard = ({ booking, onCardClick, showClear }) => {
+        const formattedDate = new Date(booking.date).toLocaleDateString(undefined, { 
+            weekday: 'short', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+
+        return (
+            <div className={`active-booking-card ${booking.status}`} onClick={() => onCardClick(booking)}>
+                <div className="booking-info">
+                    <span className="sport-name">{booking.sport_name}</span>
+                    <span className="court-name">{booking.court_name}</span>
                 </div>
-            )}
-        </div>
-    );
+                <div className="booking-date">{formattedDate}</div>
+                <div className="booking-time">{booking.time_slot}</div>
+                <div className="customer-name">{booking.customer_name}</div>
+                {showClear && booking.status === 'ended' && (
+                    <div className="ended-message">
+                        Time has ended, inform customer.
+                        {booking.payment_status === 'Completed' ? (
+                            <button 
+                                onClick={(e) => { 
+                                    e.stopPropagation();
+                                    removeBooking(booking.id); 
+                                }} 
+                                className="clear-btn"
+                            >
+                                Clear
+                            </button>
+                        ) : (
+                            <button 
+                                onClick={(e) => { 
+                                    e.stopPropagation();
+                                    markAsCompletedAndClear(booking); 
+                                }} 
+                                className="clear-btn mark-completed-btn"
+                            >
+                                Mark as Completed & Clear
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     return (
         <>
@@ -53,7 +74,6 @@ const ActiveBookings = () => {
                                 key={booking.id} 
                                 booking={booking} 
                                 onCardClick={handleCardClick} 
-                                onClear={removeBooking} 
                                 showClear={true} 
                             />
                         ))}
