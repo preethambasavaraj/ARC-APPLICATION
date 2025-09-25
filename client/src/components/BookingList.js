@@ -20,7 +20,7 @@ const BookingList = ({ bookings, onEdit, onCancel, onReceipt }) => {
         }
 
         const now = new Date();
-        const [_, endTimeStr] = booking.time_slot.split(' - ');
+        const [, endTimeStr] = booking.time_slot.split(' - ');
         const [time, modifier] = endTimeStr.trim().split(' ');
         let [hours, minutes] = time.split(':').map(Number);
 
