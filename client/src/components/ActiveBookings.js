@@ -1,34 +1,91 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useActiveBookings } from '../hooks/useActiveBookings';
+import BookingDetailsModal from './BookingDetailsModal';
 import './ActiveBookings.css';
 
-const ActiveBookings = ({ bookings, onRemoveBooking }) => {
-    return (
-        <div className="active-bookings-container">
-            <h4>Active Bookings</h4>
-            {bookings.length === 0 ? (
-                <p>No active bookings at the moment.</p>
-            ) : (
-                <div className="active-bookings-list">
-                    {bookings.map(booking => (
-                        <div key={booking.id} className={`active-booking-card ${booking.status}`}>
-                            <div className="booking-info">
-                                <span className="sport-name">{booking.sport_name}</span>
-                                <span className="court-name">{booking.court_name}</span>
-                            </div>
-                            <div className="booking-time">{booking.time_slot}</div>
-                            {booking.status === 'ended' && (
-                                <div className="ended-message">
-                                    Time has ended, inform customer.
-                                    <button onClick={() => onRemoveBooking(booking.id)} className="clear-btn">
-                                        Clear
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ))}
+const ActiveBookings = () => {
+    const { inProgress, upcoming, removeBooking } = useActiveBookings();
+    const [selectedBooking, setSelectedBooking] = useState(null);
+
+    const handleCardClick = (booking) => {
+        setSelectedBooking(booking);
+    };
+
+    const handleCloseModal = () => {
+        setSelectedBooking(null);
+    };
+
+    const BookingCard = ({ booking, onCardClick, onClear, showClear }) => (
+        <div className={`active-booking-card ${booking.status}`} onClick={() => onCardClick(booking)}>
+            <div className="booking-info">
+                <span className="sport-name">{booking.sport_name}</span>
+                <span className="court-name">{booking.court_name}</span>
+            </div>
+            <div className="booking-time">{booking.time_slot}</div>
+            <div className="customer-name">{booking.customer_name}</div>
+            {showClear && booking.status === 'ended' && (
+                <div className="ended-message">
+                    Time has ended, inform customer.
+                    <button 
+                        onClick={(e) => { 
+                            e.stopPropagation(); // Prevent modal from opening
+                            onClear(booking.id); 
+                        }} 
+                        className="clear-btn"
+                    >
+                        Clear
+                    </button>
                 </div>
             )}
         </div>
+    );
+
+    return (
+        <>
+            <div className="active-bookings-container">
+                <h4>In-Progress Bookings</h4>
+                {inProgress.length === 0 ? (
+                    <p>No active bookings at the moment.</p>
+                ) : (
+                    <div className="active-bookings-list">
+                        {inProgress.map(booking => (
+                            <BookingCard 
+                                key={booking.id} 
+                                booking={booking} 
+                                onCardClick={handleCardClick} 
+                                onClear={removeBooking} 
+                                showClear={true} 
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <div className="active-bookings-container upcoming-container">
+                <h4>Upcoming Bookings</h4>
+                {upcoming.length === 0 ? (
+                    <p>No upcoming bookings.</p>
+                ) : (
+                    <div className="active-bookings-list">
+                        {upcoming.map(booking => (
+                            <BookingCard 
+                                key={booking.id} 
+                                booking={booking} 
+                                onCardClick={handleCardClick} 
+                                showClear={false} 
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {selectedBooking && (
+                <BookingDetailsModal 
+                    booking={selectedBooking} 
+                    onClose={handleCloseModal} 
+                />
+            )}
+        </>
     );
 };
 

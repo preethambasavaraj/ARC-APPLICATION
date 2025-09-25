@@ -13,7 +13,7 @@ const getClearedIdsFromStorage = () => {
 };
 
 export const useActiveBookings = () => {
-    const [activeBookings, setActiveBookings] = useState([]);
+    const [allBookings, setAllBookings] = useState([]);
     const [clearedBookingIds, setClearedBookingIds] = useState(getClearedIdsFromStorage);
 
     useEffect(() => {
@@ -24,22 +24,23 @@ export const useActiveBookings = () => {
         }
     }, [clearedBookingIds]);
 
-    const fetchActiveBookings = useCallback(async () => {
+    const fetchAllBookings = useCallback(async () => {
         try {
-            const res = await api.get(`/bookings/active`);
-            setActiveBookings(Array.isArray(res.data) ? res.data : []);
+            // Fetch all bookings instead of just active ones
+            const res = await api.get(`/bookings/all`);
+            setAllBookings(Array.isArray(res.data) ? res.data : []);
         } catch (error) {
-            console.error("Error fetching active bookings:", error);
-            setActiveBookings([]);
+            console.error("Error fetching all bookings:", error);
+            setAllBookings([]);
         }
     }, []);
 
     useEffect(() => {
-        fetchActiveBookings();
-        const interval = setInterval(fetchActiveBookings, 60000); // Fetch every minute
+        fetchAllBookings();
+        const interval = setInterval(fetchAllBookings, 60000); // Fetch every minute
 
         return () => clearInterval(interval);
-    }, [fetchActiveBookings]);
+    }, [fetchAllBookings]);
 
     const removeBooking = useCallback((bookingId) => {
         setClearedBookingIds(prevClearedIds => {
@@ -49,12 +50,60 @@ export const useActiveBookings = () => {
         });
     }, []);
 
-    const visibleBookings = useMemo(() => {
-        if (!Array.isArray(activeBookings)) {
-            return [];
+    const categorizedBookings = useMemo(() => {
+        if (!Array.isArray(allBookings)) {
+            return { inProgress: [], upcoming: [] };
         }
-        return activeBookings.filter(booking => !clearedBookingIds.has(booking.id));
-    }, [activeBookings, clearedBookingIds]);
 
-    return { bookings: visibleBookings, removeBooking };
+        const now = new Date();
+        const today = now.toISOString().slice(0, 10);
+
+        const inProgress = [];
+        const upcoming = [];
+
+        const visibleBookings = allBookings.filter(booking => !clearedBookingIds.has(booking.id) && booking.status !== 'Cancelled');
+
+        for (const booking of visibleBookings) {
+            const bookingDate = booking.date.slice(0, 10);
+
+            const parseTime = (timeStr) => {
+                const [time, modifier] = timeStr.split(' ');
+                let [hours, minutes] = time.split(':').map(Number);
+                if (modifier === 'PM' && hours < 12) hours += 12;
+                if (modifier === 'AM' && hours === 12) hours = 0;
+                const date = new Date(booking.date);
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+            };
+
+            const [startTimeStr, endTimeStr] = booking.time_slot.split(' - ');
+            const startTime = parseTime(startTimeStr);
+            const endTime = parseTime(endTimeStr);
+
+            if (bookingDate === today) {
+                let status = 'upcoming';
+                if (now >= startTime && now <= endTime) {
+                    status = 'active';
+                } else if (now > endTime) {
+                    status = 'ended';
+                }
+
+                if (status === 'active' || status === 'ended') {
+                    inProgress.push({ ...booking, status, startTime, endTime });
+                } else {
+                    upcoming.push({ ...booking, status, startTime, endTime });
+                }
+            } else if (new Date(bookingDate) > new Date(today)) {
+                upcoming.push({ ...booking, status: 'upcoming', startTime, endTime });
+            }
+        }
+
+        // Sort upcoming by start time
+        upcoming.sort((a, b) => a.startTime - b.startTime);
+
+        return { inProgress, upcoming };
+
+    }, [allBookings, clearedBookingIds]);
+
+    return { ...categorizedBookings, removeBooking };
 };
