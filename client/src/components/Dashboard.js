@@ -163,7 +163,7 @@ const Dashboard = ({ user }) => {
                                     <td>{court.name}</td>
                                     <td>{court.sport_name}</td>
                                     <td style={{ color: court.is_available ? 'green' : 'red' }}>
-                                        {court.status === 'Under Maintenance' ? 'Maintenance' : court.is_available ? 'Available' : 'Engaged'}
+                                        {court.status === 'Under Maintenance' ? 'Maintenance' : court.is_available ? (court.available_slots ? `${court.available_slots} slots available` : 'Available') : 'Engaged'}
                                     </td>
                                 </tr>
                             ))}
