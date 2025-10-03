@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../api';
 import BookingForm from './BookingForm';
 import BookingList from './BookingList';
@@ -19,6 +19,27 @@ const Dashboard = ({ user }) => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState(null);
+    const [filters, setFilters] = useState({ sport: '', customer: '' });
+
+    const handleFilterChange = (e) => {
+        setFilters({ ...filters, [e.target.name]: e.target.value });
+    };
+
+    const [sortOrder, setSortOrder] = useState('desc'); // 'desc' for newest first
+
+    const toggleSortOrder = () => {
+        setSortOrder(currentOrder => currentOrder === 'desc' ? 'asc' : 'desc');
+    };
+
+    const sortedBookings = useMemo(() => {
+        return [...bookings].sort((a, b) => {
+            if (sortOrder === 'desc') {
+                return b.id - a.id; // Higher IDs are newer
+            } else {
+                return a.id - b.id;
+            }
+        });
+    }, [bookings, sortOrder]);
 
     const fetchAvailability = useCallback(async () => {
         if (selectedDate && startTime && endTime) {
@@ -40,12 +61,12 @@ const Dashboard = ({ user }) => {
 
     const fetchBookingsForDate = useCallback(async () => {
         try {
-            const res = await api.get(`/bookings/all`, { params: { date: selectedDate } });
+            const res = await api.get(`/bookings/all`, { params: { date: selectedDate, ...filters } });
             setBookings(res.data);
         } catch (err) {
             console.error("Error fetching bookings for date:", err);
         }
-    }, [selectedDate]);
+    }, [selectedDate, filters]);
 
     useEffect(() => {
         const fetchData = () => {
@@ -75,6 +96,7 @@ const Dashboard = ({ user }) => {
     const handleEditClick = (booking) => {
         setSelectedBooking(booking);
         setIsEditModalOpen(true);
+        setError(null);
     };
 
     const handleReceiptClick = (booking) => {
@@ -86,15 +108,23 @@ const Dashboard = ({ user }) => {
         setIsEditModalOpen(false);
         setIsReceiptModalOpen(false);
         setSelectedBooking(null);
+        setError(null);
     };
 
-    const handleSavePayment = async (bookingId, paymentData) => {
+    const [error, setError] = useState(null);
+
+    const handleSaveBooking = async (bookingId, bookingData) => {
         try {
-            await api.put(`/bookings/${bookingId}/payment`, paymentData);
+            setError(null);
+            await api.put(`/bookings/${bookingId}`, bookingData);
             handleCloseModal();
             fetchBookingsForDate(); // Refresh data
         } catch (error) {
-            console.error("Error updating payment:", error);
+            if (error.response && error.response.status === 409) {
+                setError(error.response.data.message);
+            } else {
+                console.error("Error updating booking:", error);
+            }
         }
     };
 
@@ -191,8 +221,15 @@ const Dashboard = ({ user }) => {
 
             <div style={{marginTop: '20px'}}>
                 <h3>Bookings for {selectedDate}</h3>
+                <div style={{ marginBottom: '10px' }}>
+                    <input type="text" name="sport" placeholder="Filter by sport" value={filters.sport} onChange={handleFilterChange} style={{ marginLeft: '10px' }} />
+                    <input type="text" name="customer" placeholder="Filter by customer" value={filters.customer} onChange={handleFilterChange} style={{ marginLeft: '10px' }} />
+                    <button onClick={toggleSortOrder} style={{ marginLeft: '10px' }}>
+                        Sort: {sortOrder === 'desc' ? 'Newest First' : 'Oldest First'}
+                    </button>
+                </div>
                 <BookingList 
-                    bookings={bookings} 
+                    bookings={sortedBookings} 
                     onEdit={handleEditClick} 
                     onCancel={handleCancelClick} 
                     onReceipt={handleReceiptClick}
@@ -201,8 +238,9 @@ const Dashboard = ({ user }) => {
             {isEditModalOpen && (
                 <EditBookingModal 
                     booking={selectedBooking}
-                    onSave={handleSavePayment}
+                    onSave={handleSaveBooking}
                     onClose={handleCloseModal}
+                    error={error}
                 />
             )}
             {isReceiptModalOpen && (

@@ -532,6 +532,126 @@ router.post('/bookings', authenticateToken, async (req, res) => {
     }
 });
 
+
+// Update an existing booking
+router.put('/bookings/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const {
+        customer_name,
+        customer_contact,
+        customer_email,
+        startTime,
+        endTime,
+        amount_paid,
+        payment_mode,
+        payment_status,
+        status
+    } = req.body;
+
+    try {
+        // 1. Get existing booking details
+        const [existingBookings] = await db.query('SELECT * FROM bookings WHERE id = ?', [id]);
+        if (existingBookings.length === 0) {
+            return res.status(404).json({ message: 'Booking not found' });
+        }
+        const existingBooking = existingBookings[0];
+        const { court_id, sport_id, date } = existingBooking;
+
+        // 2. Format new time slot and check for conflicts if time is changing
+        const formatTo12Hour = (time) => {
+            let [hours, minutes] = time.split(':').map(Number);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            return `${hours}:${minutes} ${ampm}`;
+        };
+
+        const newTimeSlot = `${formatTo12Hour(startTime)} - ${formatTo12Hour(endTime)}`;
+
+        if (newTimeSlot !== existingBooking.time_slot) {
+            const [conflictingBookings] = await db.query(
+                'SELECT * FROM bookings WHERE court_id = ? AND date = ? AND id != ? AND status != ?',
+                [court_id, date, id, 'Cancelled']
+            );
+
+            const toMinutes = (timeStr) => {
+                const [time, modifier] = timeStr.split(' ');
+                let [hours, minutes] = time.split(':').map(Number);
+                if (modifier === 'PM' && hours < 12) hours += 12;
+                if (modifier === 'AM' && hours === 12) hours = 0;
+                return hours * 60 + minutes;
+            };
+
+            const checkOverlap = (startA, endA, startB, endB) => {
+                const startAMin = toMinutes(startA);
+                const endAMin = toMinutes(endA);
+                const startBMin = toMinutes(startB);
+                const endBMin = toMinutes(endB);
+                return startAMin < endBMin && endAMin > startBMin;
+            };
+
+            const isOverlapping = conflictingBookings.some(booking => {
+                const [existingStart, existingEnd] = booking.time_slot.split(' - ');
+                return checkOverlap(formatTo12Hour(startTime), formatTo12Hour(endTime), existingStart.trim(), existingEnd.trim());
+            });
+
+            if (isOverlapping) {
+                return res.status(409).json({ message: 'The selected time slot conflicts with another booking.' });
+            }
+        }
+
+        // 3. Recalculate price
+        const [sports] = await db.query('SELECT price FROM sports WHERE id = ?', [sport_id]);
+        const hourly_price = sports[0].price;
+
+        const parseTime = (timeStr) => {
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours * 60 + minutes;
+        };
+        const durationInMinutes = parseTime(endTime) - parseTime(startTime);
+        
+        let total_price = 0;
+        if (durationInMinutes > 0) {
+            const num_of_hours = Math.floor(durationInMinutes / 60);
+            const remaining_minutes = durationInMinutes % 60;
+            total_price = num_of_hours * hourly_price;
+            if (remaining_minutes >= 30) {
+                total_price += hourly_price / 2;
+            }
+        }
+
+        const balance_amount = total_price - amount_paid;
+
+        // 4. Update the booking
+        const sql = `
+            UPDATE bookings 
+            SET customer_name = ?, customer_contact = ?, customer_email = ?, time_slot = ?, total_price = ?, amount_paid = ?, balance_amount = ?, payment_mode = ?, payment_status = ?, status = ?
+            WHERE id = ?
+        `;
+        const values = [
+            customer_name,
+            customer_contact,
+            customer_email,
+            newTimeSlot,
+            total_price,
+            amount_paid,
+            balance_amount,
+            payment_mode,
+            payment_status,
+            status,
+            id
+        ];
+
+        await db.query(sql, values);
+
+        res.json({ success: true, message: 'Booking updated successfully' });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Update payment status for a booking
 router.put('/bookings/:id/payment', authenticateToken, async (req, res) => {
     const { id } = req.params;
