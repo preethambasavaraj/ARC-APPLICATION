@@ -6,7 +6,7 @@ import ActiveBookings from './ActiveBookings';
 import EditBookingModal from './EditBookingModal';
 import ReceiptModal from './ReceiptModal';
 import { useActiveBookings } from '../hooks/useActiveBookings';
-import './ActiveBookings.css';
+import AvailabilityHeatmap from './AvailabilityHeatmap';
 
 const Dashboard = ({ user }) => {
     const [bookings, setBookings] = useState([]);
@@ -14,6 +14,8 @@ const Dashboard = ({ user }) => {
     const [startTime, setStartTime] = useState('09:00');
     const [endTime, setEndTime] = useState('10:00');
     const [availability, setAvailability] = useState([]);
+    const [heatmapData, setHeatmapData] = useState([]);
+    const [isHeatmapVisible, setIsHeatmapVisible] = useState(true);
     const { bookings: activeBookings, removeBooking: handleRemoveEndedBooking } = useActiveBookings();
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -68,10 +70,33 @@ const Dashboard = ({ user }) => {
         }
     }, [selectedDate, filters]);
 
+    const fetchHeatmapData = useCallback(async () => {
+        try {
+            const res = await api.get(`/availability/heatmap`, { params: { date: selectedDate } });
+            setHeatmapData(res.data);
+        } catch (err) {
+            console.error("Error fetching heatmap data:", err);
+        }
+    }, [selectedDate]);
+
+    const handleSlotSelect = (court, time, minute) => {
+        const [hour] = time.split(':').map(Number);
+        const newDate = new Date();
+        newDate.setHours(hour, minute);
+        const start = `${String(newDate.getHours()).padStart(2, '0')}:${String(newDate.getMinutes()).padStart(2, '0')}`;
+        newDate.setMinutes(newDate.getMinutes() + 30);
+        const end = `${String(newDate.getHours()).padStart(2, '0')}:${String(newDate.getMinutes()).padStart(2, '0')}`;
+
+        setStartTime(start);
+        setEndTime(end);
+        // Optionally, you can also pre-select the court in the booking form if the form supports it.
+    };
+
     useEffect(() => {
         const fetchData = () => {
             fetchAvailability();
             fetchBookingsForDate();
+            fetchHeatmapData();
         };
 
         fetchData();
@@ -80,7 +105,7 @@ const Dashboard = ({ user }) => {
         return () => {
             window.removeEventListener('focus', fetchData);
         };
-    }, [fetchAvailability, fetchBookingsForDate]);
+    }, [fetchAvailability, fetchBookingsForDate, fetchHeatmapData]);
 
     const handleBookingSuccess = () => {
         fetchAvailability();
@@ -151,6 +176,12 @@ const Dashboard = ({ user }) => {
     return (
         <div>
             <h2>Bookings</h2>
+
+            <button onClick={() => setIsHeatmapVisible(!isHeatmapVisible)} style={{ marginBottom: '10px' }}>
+                {isHeatmapVisible ? 'Hide' : 'Show'} Availability Heatmap
+            </button>
+
+            {isHeatmapVisible && <AvailabilityHeatmap heatmapData={heatmapData} onSlotSelect={handleSlotSelect} />}
 
             <div>
                 <h3>Check Availability & Book</h3>

@@ -250,6 +250,158 @@ router.get('/bookings/all', authenticateToken, async (req, res) => {
     }
 });
 
+// New endpoint for availability heatmap
+router.get('/availability/heatmap', authenticateToken, async (req, res) => {
+    const { date } = req.query;
+    if (!date) {
+        return res.status(400).json({ message: 'Date parameter is required' });
+    }
+
+    try {
+        const [courts] = await db.query('SELECT c.id, c.name, c.status, s.name as sport_name, s.capacity FROM courts c JOIN sports s ON c.sport_id = s.id ORDER BY s.name, c.name');
+        const [bookings] = await db.query('SELECT * FROM bookings WHERE date = ? AND status != ?', [date, 'Cancelled']);
+
+        const timeSlots = Array.from({ length: 16 }, (_, i) => {
+            const hour = 6 + i;
+            return `${String(hour).padStart(2, '0')}:00`;
+        });
+
+        const heatmap = courts.map(court => {
+            const courtBookings = bookings.filter(b => b.court_id === court.id);
+            const slots = timeSlots.map(slot => {
+                const slotStartHour = parseInt(slot.split(':')[0]);
+                
+                const subSlots = [0, 30].map(minute => {
+                    const subSlotStartMinutes = slotStartHour * 60 + minute;
+                    const subSlotEndMinutes = subSlotStartMinutes + 30;
+
+                    let availability = 'available';
+                    let booking_details = null;
+
+                    if (court.status === 'Under Maintenance') {
+                        availability = 'maintenance';
+                    } else {
+                        const overlappingBookings = courtBookings.filter(b => {
+                            const [startStr, endStr] = b.time_slot.split(' - ');
+                            const toMinutes = (timeStr) => {
+                                const [time, modifier] = timeStr.split(' ');
+                                let [hours, minutes] = time.split(':').map(Number);
+                                if (modifier === 'PM' && hours < 12) hours += 12;
+                                if (modifier === 'AM' && hours === 12) hours = 0;
+                                return hours * 60 + minutes;
+                            };
+                            const bookingStart = toMinutes(startStr);
+                            const bookingEnd = toMinutes(endStr);
+
+                            return subSlotStartMinutes < bookingEnd && subSlotEndMinutes > bookingStart;
+                        });
+
+                        if (overlappingBookings.length > 0) {
+                            booking_details = overlappingBookings.map(b => ({ id: b.id, customer_name: b.customer_name, time_slot: b.time_slot }));
+                            if (court.capacity > 1) {
+                                const slots_booked = overlappingBookings.reduce((acc, curr) => acc + curr.slots_booked, 0);
+                                if (slots_booked >= court.capacity) {
+                                    availability = 'full';
+                                } else {
+                                    availability = 'partial';
+                                }
+                            } else {
+                                availability = 'booked';
+                            }
+                        }
+                    }
+                    return { availability, booking: booking_details };
+                });
+
+                return { time: slot, subSlots };
+            });
+
+            return { ...court, slots };
+        });
+
+        res.json(heatmap);
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// New endpoint for availability heatmap
+router.get('/availability/heatmap', authenticateToken, async (req, res) => {
+    const { date } = req.query;
+    if (!date) {
+        return res.status(400).json({ message: 'Date parameter is required' });
+    }
+
+    try {
+        const [courts] = await db.query('SELECT c.id, c.name, c.status, s.name as sport_name, s.capacity FROM courts c JOIN sports s ON c.sport_id = s.id ORDER BY s.name, c.name');
+        const [bookings] = await db.query('SELECT * FROM bookings WHERE date = ? AND status != ?', [date, 'Cancelled']);
+
+        const timeSlots = Array.from({ length: 16 }, (_, i) => {
+            const hour = 6 + i;
+            return `${String(hour).padStart(2, '0')}:00`;
+        });
+
+        const heatmap = courts.map(court => {
+            const courtBookings = bookings.filter(b => b.court_id === court.id);
+            const slots = timeSlots.map(slot => {
+                const slotStartHour = parseInt(slot.split(':')[0]);
+                
+                const subSlots = [0, 30].map(minute => {
+                    const subSlotStartMinutes = slotStartHour * 60 + minute;
+                    const subSlotEndMinutes = subSlotStartMinutes + 30;
+
+                    let availability = 'available';
+                    let booking_details = null;
+
+                    if (court.status === 'Under Maintenance') {
+                        availability = 'maintenance';
+                    } else {
+                        const overlappingBookings = courtBookings.filter(b => {
+                            const [startStr, endStr] = b.time_slot.split(' - ');
+                            const toMinutes = (timeStr) => {
+                                const [time, modifier] = timeStr.split(' ');
+                                let [hours, minutes] = time.split(':').map(Number);
+                                if (modifier === 'PM' && hours < 12) hours += 12;
+                                if (modifier === 'AM' && hours === 12) hours = 0;
+                                return hours * 60 + minutes;
+                            };
+                            const bookingStart = toMinutes(startStr);
+                            const bookingEnd = toMinutes(endStr);
+
+                            return subSlotStartMinutes < bookingEnd && subSlotEndMinutes > bookingStart;
+                        });
+
+                        if (overlappingBookings.length > 0) {
+                            booking_details = overlappingBookings.map(b => ({ id: b.id, customer_name: b.customer_name, time_slot: b.time_slot }));
+                            if (court.capacity > 1) {
+                                const slots_booked = overlappingBookings.reduce((acc, curr) => acc + curr.slots_booked, 0);
+                                if (slots_booked >= court.capacity) {
+                                    availability = 'full';
+                                } else {
+                                    availability = 'partial';
+                                }
+                            } else {
+                                availability = 'booked';
+                            }
+                        }
+                    }
+                    return { availability, booking: booking_details };
+                });
+
+                return { time: slot, subSlots };
+            });
+
+            return { ...court, slots };
+        });
+
+        res.json(heatmap);
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Get active bookings
 router.get('/bookings/active', authenticateToken, async (req, res) => {
     try {
