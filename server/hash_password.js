@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 
   // --- CHANGE THE PASSWORD IN THE LINE BELOW ---
-  const plainTextPassword = 'superadmin';
+  const plainTextPassword = 'admin';
   // -----------------------------------------
 
   const saltRounds = 10;
