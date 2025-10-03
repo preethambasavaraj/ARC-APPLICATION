@@ -76,10 +76,9 @@ const EditBookingModal = ({ booking, onSave, onClose, error }) => {
         const minutes = parseInt(e.target.value, 10);
         setExtensionMinutes(minutes);
 
-        const [ endTimeStr] = formData.time_slot.split(' - ');
-        const parsedEndTime = parseTime(endTimeStr);
+        const [hours, mins] = formData.endTime.split(':').map(Number);
         const endDate = new Date(formData.date);
-        endDate.setHours(parsedEndTime.hours, parsedEndTime.minutes);
+        endDate.setHours(hours, mins);
 
         const newEndDate = new Date(endDate.getTime() + minutes * 60000);
         const newEndTime = formatTime24(newEndDate);
