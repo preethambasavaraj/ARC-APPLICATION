@@ -540,6 +540,7 @@ router.put('/bookings/:id', authenticateToken, async (req, res) => {
         customer_name,
         customer_contact,
         customer_email,
+        date: newDate, // Renaming for clarity
         startTime,
         endTime,
         amount_paid,
@@ -555,9 +556,11 @@ router.put('/bookings/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ message: 'Booking not found' });
         }
         const existingBooking = existingBookings[0];
-        const { court_id, sport_id, date } = existingBooking;
+        const { court_id, sport_id } = existingBooking;
 
-        // 2. Format new time slot and check for conflicts if time is changing
+        const dateForConflictCheck = newDate ? new Date(newDate).toISOString().slice(0, 10) : existingBooking.date;
+
+        // 2. Format new time slot and check for conflicts if time or date is changing
         const formatTo12Hour = (time) => {
             let [hours, minutes] = time.split(':').map(Number);
             const ampm = hours >= 12 ? 'PM' : 'AM';
@@ -569,10 +572,10 @@ router.put('/bookings/:id', authenticateToken, async (req, res) => {
 
         const newTimeSlot = `${formatTo12Hour(startTime)} - ${formatTo12Hour(endTime)}`;
 
-        if (newTimeSlot !== existingBooking.time_slot) {
+        if (newTimeSlot !== existingBooking.time_slot || dateForConflictCheck !== existingBooking.date) {
             const [conflictingBookings] = await db.query(
                 'SELECT * FROM bookings WHERE court_id = ? AND date = ? AND id != ? AND status != ?',
-                [court_id, date, id, 'Cancelled']
+                [court_id, dateForConflictCheck, id, 'Cancelled']
             );
 
             const toMinutes = (timeStr) => {
@@ -626,13 +629,14 @@ router.put('/bookings/:id', authenticateToken, async (req, res) => {
         // 4. Update the booking
         const sql = `
             UPDATE bookings 
-            SET customer_name = ?, customer_contact = ?, customer_email = ?, time_slot = ?, total_price = ?, amount_paid = ?, balance_amount = ?, payment_mode = ?, payment_status = ?, status = ?
+            SET customer_name = ?, customer_contact = ?, customer_email = ?, date = ?, time_slot = ?, total_price = ?, amount_paid = ?, balance_amount = ?, payment_mode = ?, payment_status = ?, status = ?
             WHERE id = ?
         `;
         const values = [
             customer_name,
             customer_contact,
             customer_email,
+            dateForConflictCheck,
             newTimeSlot,
             total_price,
             amount_paid,

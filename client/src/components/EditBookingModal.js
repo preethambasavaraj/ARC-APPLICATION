@@ -4,6 +4,30 @@ import api from '../api';
 const EditBookingModal = ({ booking, onSave, onClose, error }) => {
     const [formData, setFormData] = useState({});
     const [extensionMinutes, setExtensionMinutes] = useState(0);
+    const [availabilityMessage, setAvailabilityMessage] = useState('');
+
+    const checkAvailability = async () => {
+        if (formData.date && formData.startTime && formData.endTime) {
+            try {
+                const res = await api.get('/courts/availability', {
+                    params: {
+                        date: new Date(formData.date).toISOString().slice(0, 10),
+                        startTime: formData.startTime,
+                        endTime: formData.endTime
+                    }
+                });
+                const courtAvailability = res.data.find(c => c.id === formData.court_id);
+                if (courtAvailability && !courtAvailability.is_available) {
+                    setAvailabilityMessage('This slot is not available.');
+                } else {
+                    setAvailabilityMessage('This slot is available.');
+                }
+            } catch (error) {
+                console.error("Error checking availability:", error);
+                setAvailabilityMessage('Could not check availability.');
+            }
+        }
+    };
 
     const parseTime = (timeStr) => {
         if (!timeStr) return null;
@@ -44,11 +68,15 @@ const EditBookingModal = ({ booking, onSave, onClose, error }) => {
         }
     }, [booking]);
 
+    useEffect(() => {
+        checkAvailability();
+    }, [formData.date, formData.startTime, formData.endTime, formData.court_id]);
+
     const handleExtensionChange = (e) => {
         const minutes = parseInt(e.target.value, 10);
         setExtensionMinutes(minutes);
 
-        const [startTimeStr, endTimeStr] = formData.time_slot.split(' - ');
+        const [ endTimeStr] = formData.time_slot.split(' - ');
         const parsedEndTime = parseTime(endTimeStr);
         const endDate = new Date(formData.date);
         endDate.setHours(parsedEndTime.hours, parsedEndTime.minutes);
@@ -124,6 +152,25 @@ const EditBookingModal = ({ booking, onSave, onClose, error }) => {
                 <h4>Customer Details</h4>
                 <input name="customer_name" value={formData.customer_name || ''} onChange={handleInputChange} placeholder="Customer Name" />
                 <input name="customer_contact" value={formData.customer_contact || ''} onChange={handleInputChange} placeholder="Customer Contact" />
+
+                <hr style={{ margin: '20px 0' }}/>
+
+                <h4>Reschedule</h4>
+                <div style={{ margin: '10px 0' }}>
+                    <label>New Date: </label>
+                    <input type="date" name="date" value={formData.date ? new Date(formData.date).toISOString().slice(0, 10) : ''} onChange={handleInputChange} />
+                </div>
+                <div style={{ margin: '10px 0' }}>
+                    <label>New Start Time: </label>
+                    <input type="time" name="startTime" value={formData.startTime || ''} onChange={handleInputChange} />
+                </div>
+                <div style={{ margin: '10px 0' }}>
+                    <label>New End Time: </label>
+                    <input type="time" name="endTime" value={formData.endTime || ''} onChange={handleInputChange} />
+                </div>
+                {availabilityMessage && <p style={{ color: availabilityMessage.includes('not') ? 'red' : 'green' }}>{availabilityMessage}</p>}
+
+                <hr style={{ margin: '20px 0' }}/>
 
                 <h4>Payment</h4>
                 <input type="number" name="amount_paid" value={formData.amount_paid || 0} onChange={handleInputChange} placeholder="Amount Paid" />
