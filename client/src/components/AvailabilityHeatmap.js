@@ -37,6 +37,7 @@ const AvailabilityHeatmap = ({ heatmapData, onSlotSelect }) => {
                             <p><strong>Booking ID:</strong> {b.id}</p>
                             <p><strong>Customer:</strong> {b.customer_name}</p>
                             <p><strong>Time:</strong> {b.time_slot}</p>
+                            <p><strong>Slots Booked:</strong> {b.slots_booked}</p>
                         </div>
                     ))}
                 </div>
@@ -73,23 +74,26 @@ const AvailabilityHeatmap = ({ heatmapData, onSlotSelect }) => {
                             {court.slots.map(slot => (
                                 <td key={slot.time} style={{ padding: 0, border: '1px solid #ddd', textAlign: 'center' }}>
                                     <div style={{ display: 'flex', height: '100%' }}>
-                                        {slot.subSlots.map((subSlot, index) => (
-                                            <div
-                                                key={index}
-                                                style={{
-                                                    backgroundColor: getCellColor(subSlot.availability),
-                                                    width: '50%',
-                                                    height: '40px',
-                                                    borderRight: index === 0 ? '1px solid #ddd' : 'none',
-                                                    cursor: subSlot.availability === 'available' || subSlot.availability === 'partial' ? 'pointer' : 'not-allowed'
-                                                }}
-                                                onClick={() => (subSlot.availability === 'available' || subSlot.availability === 'partial') && onSlotSelect(court, slot.time, index * 30)}
-                                                onMouseEnter={(e) => handleMouseEnter(e, subSlot)}
-                                                onMouseLeave={handleMouseLeave}
-                                            >
-                                                {subSlot.availability === 'partial' ? `${court.capacity - subSlot.slots_booked}/${court.capacity}` : ''}
-                                            </div>
-                                        ))}
+                                        {slot.subSlots.map((subSlot, index) => {
+                                            const totalSlotsBooked = subSlot.booking ? subSlot.booking.reduce((acc, b) => acc + (Number(b.slots_booked) || 0), 0) : 0;
+                                            return (
+                                                <div
+                                                    key={index}
+                                                    style={{
+                                                        backgroundColor: getCellColor(subSlot.availability),
+                                                        width: '50%',
+                                                        height: '40px',
+                                                        borderRight: index === 0 ? '1px solid #ddd' : 'none',
+                                                        cursor: subSlot.availability === 'available' || subSlot.availability === 'partial' ? 'pointer' : 'not-allowed'
+                                                    }}
+                                                    onClick={() => (subSlot.availability === 'available' || subSlot.availability === 'partial') && onSlotSelect(court, slot.time, index * 30)}
+                                                    onMouseEnter={(e) => handleMouseEnter(e, subSlot)}
+                                                    onMouseLeave={handleMouseLeave}
+                                                >
+                                                    {subSlot.availability === 'partial' ? `${court.capacity - totalSlotsBooked}/${court.capacity}` : ''}
+                                                </div>
+                                            )
+                                        })}
                                     </div>
                                 </td>
                             ))}
