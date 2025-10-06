@@ -487,11 +487,17 @@ router.get('/booking/:id/receipt.pdf', async (req, res) => {
         const booking = rows[0];
 
         const doc = new PDFDocument({ size: 'A4', margin: 50 });
-
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="receipt-${booking.booking_id}.pdf"`);
-
-        doc.pipe(res);
+        const buffers = [];
+        doc.on('data', buffers.push.bind(buffers));
+        doc.on('end', () => {
+            const pdfData = Buffer.concat(buffers);
+            res.writeHead(200, {
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `attachment; filename="receipt-${booking.booking_id}.pdf"`,
+                'Content-Length': pdfData.length
+            });
+            res.end(pdfData);
+        });
 
         // Header
         doc.fontSize(20).text('ARC SportsZone Booking Receipt', { align: 'center' });
