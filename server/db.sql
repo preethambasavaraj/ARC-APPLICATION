@@ -63,6 +63,27 @@ INSERT INTO `courts` (sport_id, name) VALUES
   ALTER TABLE bookings
   ADD COLUMN total_price DECIMAL(10, 2) NOT NULL DEFAULT 0.00;
 
+-- Add capacity to sports table
+ALTER TABLE sports ADD COLUMN capacity INT DEFAULT 1;
+
+-- Add slots_booked to bookings table
+ALTER TABLE bookings ADD COLUMN slots_booked INT DEFAULT 1;
+
+-- Update capacity for Swimming
+UPDATE sports SET capacity = 30 WHERE id = 4;
+
+-- Drop the existing foreign key constraint on sport_id in the bookings table
+-- The name of the constraint might be different on your system.
+-- If this fails, you can find the correct name by running:
+-- SHOW CREATE TABLE bookings;
+ALTER TABLE bookings DROP FOREIGN KEY `bookings_ibfk_1`;
+
+-- Add the foreign key constraint back with ON DELETE SET NULL
+ALTER TABLE bookings ADD CONSTRAINT `fk_bookings_sport_id` FOREIGN KEY (`sport_id`) REFERENCES `sports`(`id`) ON DELETE SET NULL;
+
+-- Add a new foreign key constraint for court_id with ON DELETE SET NULL
+ALTER TABLE bookings ADD CONSTRAINT `fk_bookings_court_id` FOREIGN KEY (`court_id`) REFERENCES `courts`(`id`) ON DELETE SET NULL;
+
 select * from bookings;
 select * from courts;
 

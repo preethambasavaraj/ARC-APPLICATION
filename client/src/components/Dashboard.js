@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../api';
 import BookingForm from './BookingForm';
 import BookingList from './BookingList';
@@ -6,7 +6,7 @@ import ActiveBookings from './ActiveBookings';
 import EditBookingModal from './EditBookingModal';
 import ReceiptModal from './ReceiptModal';
 import { useActiveBookings } from '../hooks/useActiveBookings';
-import './ActiveBookings.css';
+import AvailabilityHeatmap from './AvailabilityHeatmap';
 
 const Dashboard = ({ user }) => {
     const [bookings, setBookings] = useState([]);
@@ -14,11 +14,34 @@ const Dashboard = ({ user }) => {
     const [startTime, setStartTime] = useState('09:00');
     const [endTime, setEndTime] = useState('10:00');
     const [availability, setAvailability] = useState([]);
+    const [heatmapData, setHeatmapData] = useState([]);
+    const [isHeatmapVisible, setIsHeatmapVisible] = useState(true);
     const { bookings: activeBookings, removeBooking: handleRemoveEndedBooking } = useActiveBookings();
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState(null);
+    const [filters, setFilters] = useState({ sport: '', customer: '' });
+
+    const handleFilterChange = (e) => {
+        setFilters({ ...filters, [e.target.name]: e.target.value });
+    };
+
+    const [sortOrder, setSortOrder] = useState('desc'); // 'desc' for newest first
+
+    const toggleSortOrder = () => {
+        setSortOrder(currentOrder => currentOrder === 'desc' ? 'asc' : 'desc');
+    };
+
+    const sortedBookings = useMemo(() => {
+        return [...bookings].sort((a, b) => {
+            if (sortOrder === 'desc') {
+                return b.id - a.id; // Higher IDs are newer
+            } else {
+                return a.id - b.id;
+            }
+        });
+    }, [bookings, sortOrder]);
 
     const fetchAvailability = useCallback(async () => {
         if (selectedDate && startTime && endTime) {
@@ -40,17 +63,40 @@ const Dashboard = ({ user }) => {
 
     const fetchBookingsForDate = useCallback(async () => {
         try {
-            const res = await api.get(`/bookings/all`, { params: { date: selectedDate } });
+            const res = await api.get(`/bookings/all`, { params: { date: selectedDate, ...filters } });
             setBookings(res.data);
         } catch (err) {
             console.error("Error fetching bookings for date:", err);
         }
+    }, [selectedDate, filters]);
+
+    const fetchHeatmapData = useCallback(async () => {
+        try {
+            const res = await api.get(`/availability/heatmap`, { params: { date: selectedDate } });
+            setHeatmapData(res.data);
+        } catch (err) {
+            console.error("Error fetching heatmap data:", err);
+        }
     }, [selectedDate]);
+
+    const handleSlotSelect = (court, time, minute) => {
+        const [hour] = time.split(':').map(Number);
+        const newDate = new Date();
+        newDate.setHours(hour, minute);
+        const start = `${String(newDate.getHours()).padStart(2, '0')}:${String(newDate.getMinutes()).padStart(2, '0')}`;
+        newDate.setMinutes(newDate.getMinutes() + 30);
+        const end = `${String(newDate.getHours()).padStart(2, '0')}:${String(newDate.getMinutes()).padStart(2, '0')}`;
+
+        setStartTime(start);
+        setEndTime(end);
+        // Optionally, you can also pre-select the court in the booking form if the form supports it.
+    };
 
     useEffect(() => {
         const fetchData = () => {
             fetchAvailability();
             fetchBookingsForDate();
+            fetchHeatmapData();
         };
 
         fetchData();
@@ -59,7 +105,7 @@ const Dashboard = ({ user }) => {
         return () => {
             window.removeEventListener('focus', fetchData);
         };
-    }, [fetchAvailability, fetchBookingsForDate]);
+    }, [fetchAvailability, fetchBookingsForDate, fetchHeatmapData]);
 
     const handleBookingSuccess = () => {
         fetchAvailability();
@@ -75,6 +121,7 @@ const Dashboard = ({ user }) => {
     const handleEditClick = (booking) => {
         setSelectedBooking(booking);
         setIsEditModalOpen(true);
+        setError(null);
     };
 
     const handleReceiptClick = (booking) => {
@@ -86,15 +133,23 @@ const Dashboard = ({ user }) => {
         setIsEditModalOpen(false);
         setIsReceiptModalOpen(false);
         setSelectedBooking(null);
+        setError(null);
     };
 
-    const handleSavePayment = async (bookingId, paymentData) => {
+    const [error, setError] = useState(null);
+
+    const handleSaveBooking = async (bookingId, bookingData) => {
         try {
-            await api.put(`/bookings/${bookingId}/payment`, paymentData);
+            setError(null);
+            await api.put(`/bookings/${bookingId}`, bookingData);
             handleCloseModal();
             fetchBookingsForDate(); // Refresh data
         } catch (error) {
-            console.error("Error updating payment:", error);
+            if (error.response && error.response.status === 409) {
+                setError(error.response.data.message);
+            } else {
+                console.error("Error updating booking:", error);
+            }
         }
     };
 
@@ -121,6 +176,12 @@ const Dashboard = ({ user }) => {
     return (
         <div>
             <h2>Bookings</h2>
+
+            <button onClick={() => setIsHeatmapVisible(!isHeatmapVisible)} style={{ marginBottom: '10px' }}>
+                {isHeatmapVisible ? 'Hide' : 'Show'} Availability Heatmap
+            </button>
+
+            {isHeatmapVisible && <AvailabilityHeatmap heatmapData={heatmapData} onSlotSelect={handleSlotSelect} />}
 
             <div>
                 <h3>Check Availability & Book</h3>
@@ -163,7 +224,7 @@ const Dashboard = ({ user }) => {
                                     <td>{court.name}</td>
                                     <td>{court.sport_name}</td>
                                     <td style={{ color: court.is_available ? 'green' : 'red' }}>
-                                        {court.status === 'Under Maintenance' ? 'Maintenance' : court.is_available ? 'Available' : 'Engaged'}
+                                        {court.status === 'Under Maintenance' ? 'Maintenance' : court.is_available ? (court.available_slots ? `${court.available_slots} slots available` : 'Available') : 'Engaged'}
                                     </td>
                                 </tr>
                             ))}
@@ -191,8 +252,15 @@ const Dashboard = ({ user }) => {
 
             <div style={{marginTop: '20px'}}>
                 <h3>Bookings for {selectedDate}</h3>
+                <div style={{ marginBottom: '10px' }}>
+                    <input type="text" name="sport" placeholder="Filter by sport" value={filters.sport} onChange={handleFilterChange} style={{ marginLeft: '10px' }} />
+                    <input type="text" name="customer" placeholder="Filter by customer" value={filters.customer} onChange={handleFilterChange} style={{ marginLeft: '10px' }} />
+                    <button onClick={toggleSortOrder} style={{ marginLeft: '10px' }}>
+                        Sort: {sortOrder === 'desc' ? 'Newest First' : 'Oldest First'}
+                    </button>
+                </div>
                 <BookingList 
-                    bookings={bookings} 
+                    bookings={sortedBookings} 
                     onEdit={handleEditClick} 
                     onCancel={handleCancelClick} 
                     onReceipt={handleReceiptClick}
@@ -201,8 +269,9 @@ const Dashboard = ({ user }) => {
             {isEditModalOpen && (
                 <EditBookingModal 
                     booking={selectedBooking}
-                    onSave={handleSavePayment}
+                    onSave={handleSaveBooking}
                     onClose={handleCloseModal}
+                    error={error}
                 />
             )}
             {isReceiptModalOpen && (

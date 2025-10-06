@@ -1,79 +1,124 @@
 .active-bookings-container {
+    padding: 15px;
     background-color: #f9f9f9;
-    border: 1px solid #ddd;
     border-radius: 8px;
-    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.upcoming-container {
+    margin-top: 20px;
+}
+
+.active-bookings-container h4 {
+    margin-top: 0;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
 }
 
 .active-bookings-list {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
+    flex-wrap: wrap;
+    gap: 15px;
 }
 
 .active-booking-card {
-    border: 1px solid #ccc;
+    background-color: #fff;
+    border-left: 5px solid #ccc; /* Default border */
+    padding: 10px 15px;
     border-radius: 5px;
-    padding: 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    width: 280px;
+    cursor: pointer; /* Make cards look clickable */
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.active-booking-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.active-booking-card.upcoming {
+    border-left-color: #17a2b8; /* Blue for upcoming */
 }
 
 .active-booking-card.active {
-    background-color: #e6ffed;
-    border-left: 5px solid #4caf50;
+    border-left-color: #28a745; /* Green for active */
+    animation: pulse 2s infinite;
 }
 
 .active-booking-card.ended {
-    background-color: #ffebee;
-    border-left: 5px solid #f44336;
+    border-left-color: #dc3545; /* Red for ended */
 }
 
-.ended-message {
-    color: #f44336;
-    font-weight: bold;
+.booking-info {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    justify-content: space-between;
+    font-weight: bold;
+    margin-bottom: 8px;
 }
 
 .sport-name {
-    font-weight: bold;
+    color: #333;
 }
 
 .court-name {
-    margin-left: 10px;
-}
-
-.clear-btn {
-    background-color: #f44336;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 4px;
-    cursor: pointer;
+    color: #666;
     font-size: 0.9em;
 }
 
-.clear-btn:hover {
-    background-color: #d32f2f;
+.booking-date {
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 4px;
+    text-align: center;
 }
 
-@media (max-width: 600px) {
-    .active-booking-card {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
+.booking-time {
+    font-size: 1.1em;
+    color: #0056b3;
+    margin-bottom: 8px;
+    text-align: center;
+}
 
-    .court-name {
-        margin-left: 0;
-    }
+.customer-name {
+    font-size: 0.95em;
+    color: #555;
+    text-align: center;
+}
 
-    .clear-btn {
-        width: 100%;
-        text-align: center;
-        padding: 10px;
+.ended-message {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+    text-align: center;
+    font-size: 0.9em;
+    color: #c00;
+}
+
+.clear-btn {
+    margin-left: 10px;
+    padding: 3px 8px;
+    border: 1px solid #ccc;
+    background-color: #f0f0f0;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+.mark-completed-btn {
+    background-color: #28a745; /* Green */
+    color: white;
+    border-color: #28a745;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 1px 3px rgba(40, 167, 69, 0.2);
+    }
+    50% {
+        box-shadow: 0 1px 15px rgba(40, 167, 69, 0.5);
+    }
+    100% {
+        box-shadow: 0 1px 3px rgba(40, 167, 69, 0.2);
     }
 }

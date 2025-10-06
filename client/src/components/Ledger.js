@@ -50,6 +50,7 @@ const Ledger = () => {
     const handleEditClick = (booking) => {
         setSelectedBooking(booking);
         setIsEditModalOpen(true);
+        setError(null);
     };
 
     const handleReceiptClick = (booking) => {
@@ -61,15 +62,23 @@ const Ledger = () => {
         setIsEditModalOpen(false);
         setIsReceiptModalOpen(false);
         setSelectedBooking(null);
+        setError(null);
     };
 
-    const handleSavePayment = async (bookingId, paymentData) => {
+    const [error, setError] = useState(null);
+
+    const handleSaveBooking = async (bookingId, bookingData) => {
         try {
-            await api.put(`/bookings/${bookingId}/payment`, paymentData);
+            setError(null);
+            await api.put(`/bookings/${bookingId}`, bookingData);
             handleCloseModal();
             fetchFilteredBookings(); // Refresh data
         } catch (error) {
-            console.error("Error updating payment:", error);
+            if (error.response && error.response.status === 409) {
+                setError(error.response.data.message);
+            } else {
+                console.error("Error updating booking:", error);
+            }
         }
     };
 
@@ -104,8 +113,9 @@ const Ledger = () => {
             {isEditModalOpen && (
                 <EditBookingModal 
                     booking={selectedBooking}
-                    onSave={handleSavePayment}
+                    onSave={handleSaveBooking}
                     onClose={handleCloseModal}
+                    error={error}
                 />
             )}
             {isReceiptModalOpen && (

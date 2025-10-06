@@ -118,8 +118,8 @@ router.get('/courts/availability', authenticateToken, async (req, res) => {
     }
 
     try {
-        const [courts] = await db.query('SELECT c.id, c.name, c.status, c.sport_id, s.name as sport_name, s.price FROM courts c JOIN sports s ON c.sport_id = s.id');
-        const [bookings] = await db.query('SELECT court_id, time_slot FROM bookings WHERE date = ?', [date]);
+        const [courts] = await db.query('SELECT c.id, c.name, c.status, c.sport_id, s.name as sport_name, s.price, s.capacity FROM courts c JOIN sports s ON c.sport_id = s.id');
+        const [bookings] = await db.query('SELECT court_id, time_slot, slots_booked FROM bookings WHERE date = ?', [date]);
 
         const toMinutes = (timeStr) => {
             const [time, modifier] = timeStr.split(' ');
@@ -151,12 +151,28 @@ router.get('/courts/availability', authenticateToken, async (req, res) => {
 
             const courtBookings = bookings.filter(b => b.court_id === court.id);
 
-            const isOverlapping = courtBookings.some(booking => {
-                const [existingStart, existingEnd] = booking.time_slot.split(' - ');
-                return checkOverlap(startTime, endTime, existingStart.trim(), existingEnd.trim());
-            });
+            if (court.capacity > 1) {
+                const isOverlapping = courtBookings.some(booking => {
+                    const [existingStart, existingEnd] = booking.time_slot.split(' - ');
+                    return checkOverlap(startTime, endTime, existingStart.trim(), existingEnd.trim());
+                });
 
-            return { ...court, is_available: !isOverlapping };
+                if(isOverlapping) {
+                    const slotsBooked = courtBookings.reduce((total, booking) => total + booking.slots_booked, 0);
+                    const availableSlots = court.capacity - slotsBooked;
+                    return { ...court, is_available: availableSlots > 0, available_slots: availableSlots };
+                } else {
+                    return { ...court, is_available: true, available_slots: court.capacity };
+                }
+
+            } else {
+                const isOverlapping = courtBookings.some(booking => {
+                    const [existingStart, existingEnd] = booking.time_slot.split(' - ');
+                    return checkOverlap(startTime, endTime, existingStart.trim(), existingEnd.trim());
+                });
+    
+                return { ...court, is_available: !isOverlapping };
+            }
         });
 
         res.json(availability);
@@ -229,6 +245,82 @@ router.get('/bookings/all', authenticateToken, async (req, res) => {
 
         const [rows] = await db.query(query, queryParams);
         res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// New endpoint for availability heatmap
+router.get('/availability/heatmap', authenticateToken, async (req, res) => {
+    const { date } = req.query;
+    if (!date) {
+        return res.status(400).json({ message: 'Date parameter is required' });
+    }
+
+    try {
+        const [courts] = await db.query('SELECT c.id, c.name, c.status, s.name as sport_name, s.capacity FROM courts c JOIN sports s ON c.sport_id = s.id ORDER BY s.name, c.name');
+        const [bookings] = await db.query('SELECT * FROM bookings WHERE date = ? AND status != ?', [date, 'Cancelled']);
+
+        const timeSlots = Array.from({ length: 16 }, (_, i) => {
+            const hour = 6 + i;
+            return `${String(hour).padStart(2, '0')}:00`;
+        });
+
+        const heatmap = courts.map(court => {
+            const courtBookings = bookings.filter(b => b.court_id === court.id);
+            const slots = timeSlots.map(slot => {
+                const slotStartHour = parseInt(slot.split(':')[0]);
+                
+                const subSlots = [0, 30].map(minute => {
+                    const subSlotStartMinutes = slotStartHour * 60 + minute;
+                    const subSlotEndMinutes = subSlotStartMinutes + 30;
+
+                    let availability = 'available';
+                    let booking_details = null;
+
+                    if (court.status === 'Under Maintenance') {
+                        availability = 'maintenance';
+                    } else {
+                        const overlappingBookings = courtBookings.filter(b => {
+                            const [startStr, endStr] = b.time_slot.split(' - ');
+                            const toMinutes = (timeStr) => {
+                                const [time, modifier] = timeStr.split(' ');
+                                let [hours, minutes] = time.split(':').map(Number);
+                                if (modifier === 'PM' && hours < 12) hours += 12;
+                                if (modifier === 'AM' && hours === 12) hours = 0;
+                                return hours * 60 + minutes;
+                            };
+                            const bookingStart = toMinutes(startStr);
+                            const bookingEnd = toMinutes(endStr);
+
+                            return subSlotStartMinutes < bookingEnd && subSlotEndMinutes > bookingStart;
+                        });
+
+                        if (overlappingBookings.length > 0) {
+                            booking_details = overlappingBookings.map(b => ({ id: b.id, customer_name: b.customer_name, time_slot: b.time_slot, slots_booked: b.slots_booked }));
+                            if (court.capacity > 1) {
+                                const slots_booked = overlappingBookings.reduce((acc, curr) => acc + curr.slots_booked, 0);
+                                if (slots_booked >= court.capacity) {
+                                    availability = 'full';
+                                } else {
+                                    availability = 'partial';
+                                }
+                            } else {
+                                availability = 'booked';
+                            }
+                        }
+                    }
+                    return { availability, booking: booking_details };
+                });
+
+                return { time: slot, subSlots };
+            });
+
+            return { ...court, slots };
+        });
+
+        res.json(heatmap);
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -319,11 +411,17 @@ router.get('/booking/:id/receipt.pdf', async (req, res) => {
         const booking = rows[0];
 
         const doc = new PDFDocument({ size: 'A4', margin: 50 });
-
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="receipt-${booking.booking_id}.pdf"`);
-
-        doc.pipe(res);
+        const buffers = [];
+        doc.on('data', buffers.push.bind(buffers));
+        doc.on('end', () => {
+            const pdfData = Buffer.concat(buffers);
+            res.writeHead(200, {
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `attachment; filename="receipt-${booking.booking_id}.pdf"`,
+                'Content-Length': pdfData.length
+            });
+            res.end(pdfData);
+        });
 
         // Header
         doc.fontSize(20).text('ARC SportsZone Booking Receipt', { align: 'center' });
@@ -369,7 +467,7 @@ router.get('/booking/:id/receipt.pdf', async (req, res) => {
 
 // Calculate price dynamically
 router.post('/bookings/calculate-price', authenticateToken, async (req, res) => {
-    const { sport_id, startTime, endTime } = req.body;
+    const { sport_id, startTime, endTime, slots_booked } = req.body;
 
     if (!sport_id || !startTime || !endTime) {
         return res.status(400).json({ message: 'sport_id, startTime, and endTime are required.' });
@@ -400,6 +498,10 @@ router.post('/bookings/calculate-price', authenticateToken, async (req, res) => 
             total_price += hourly_price / 2;
         }
 
+        if (slots_booked > 1) {
+            total_price *= slots_booked;
+        }
+
         res.json({ total_price });
 
     } catch (err) {
@@ -409,7 +511,7 @@ router.post('/bookings/calculate-price', authenticateToken, async (req, res) => 
 
 // Add a new booking
 router.post('/bookings', authenticateToken, async (req, res) => {
-    const { court_id, customer_name, customer_contact, customer_email, date, startTime, endTime, payment_mode, amount_paid } = req.body;
+    const { court_id, customer_name, customer_contact, customer_email, date, startTime, endTime, payment_mode, amount_paid, slots_booked } = req.body;
     const created_by_user_id = req.user.id; // Get user ID from JWT
 
     try {
@@ -419,11 +521,12 @@ router.post('/bookings', authenticateToken, async (req, res) => {
         }
         const sport_id = courts[0].sport_id;
 
-        const [sports] = await db.query('SELECT price FROM sports WHERE id = ?', [sport_id]);
+        const [sports] = await db.query('SELECT price, capacity FROM sports WHERE id = ?', [sport_id]);
         if (sports.length === 0) {
             return res.status(404).json({ message: 'Sport not found' });
         }
         const hourly_price = sports[0].price;
+        const capacity = sports[0].capacity;
 
         // New duration-based pricing logic
         const parseTime = (timeStr) => {
@@ -443,6 +546,10 @@ router.post('/bookings', authenticateToken, async (req, res) => {
         if (remaining_minutes >= 30) {
             total_price += hourly_price / 2;
         }
+
+        if (slots_booked > 1) {
+            total_price *= slots_booked;
+        }
         // End of new pricing logic
 
         const balance_amount = total_price - amount_paid;
@@ -452,7 +559,7 @@ router.post('/bookings', authenticateToken, async (req, res) => {
             payment_status = balance_amount <= 0 ? 'Completed' : 'Received';
         }
 
-        const [existingBookings] = await db.query('SELECT time_slot FROM bookings WHERE court_id = ? AND date = ? AND status != ?', [court_id, date, 'Cancelled']);
+        const [existingBookings] = await db.query('SELECT time_slot, slots_booked FROM bookings WHERE court_id = ? AND date = ? AND status != ?', [court_id, date, 'Cancelled']);
         
         const toMinutes = (timeStr) => {
             const [time, modifier] = timeStr.split(' ');
@@ -476,7 +583,15 @@ router.post('/bookings', authenticateToken, async (req, res) => {
         });
 
         if (isOverlapping) {
-            return res.status(409).json({ message: 'The selected time slot is unavailable.' });
+            if (capacity > 1) {
+                const slotsBooked = existingBookings.reduce((total, booking) => total + booking.slots_booked, 0);
+                const availableSlots = capacity - slotsBooked;
+                if (slots_booked > availableSlots) {
+                    return res.status(409).json({ message: 'Not enough slots available for the selected time.' });
+                }
+            } else {
+                return res.status(409).json({ message: 'The selected time slot is unavailable.' });
+            }
         }
 
         const formatTo12Hour = (time) => {
@@ -489,11 +604,135 @@ router.post('/bookings', authenticateToken, async (req, res) => {
         };
 
         const time_slot = `${formatTo12Hour(startTime)} - ${formatTo12Hour(endTime)}`;
-        const sql = 'INSERT INTO bookings (court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid, total_price, balance_amount, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
-        const values = [court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid, total_price, balance_amount, payment_status];
+        const sql = 'INSERT INTO bookings (court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid, total_price, balance_amount, payment_status, slots_booked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+        const values = [court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid, total_price, balance_amount, payment_status, slots_booked];
 
         const [result] = await db.query(sql, values);
         res.json({ success: true, bookingId: result.insertId });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// Update an existing booking
+router.put('/bookings/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const {
+        customer_name,
+        customer_contact,
+        customer_email,
+        date: newDate, // Renaming for clarity
+        startTime,
+        endTime,
+        amount_paid,
+        payment_mode,
+        payment_status,
+        status
+    } = req.body;
+
+    try {
+        // 1. Get existing booking details
+        const [existingBookings] = await db.query('SELECT * FROM bookings WHERE id = ?', [id]);
+        if (existingBookings.length === 0) {
+            return res.status(404).json({ message: 'Booking not found' });
+        }
+        const existingBooking = existingBookings[0];
+        const { court_id, sport_id } = existingBooking;
+
+        const dateForConflictCheck = newDate ? new Date(newDate).toISOString().slice(0, 10) : existingBooking.date;
+
+        // 2. Format new time slot and check for conflicts if time or date is changing
+        const formatTo12Hour = (time) => {
+            let [hours, minutes] = time.split(':').map(Number);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            return `${hours}:${minutes} ${ampm}`;
+        };
+
+        const newTimeSlot = `${formatTo12Hour(startTime)} - ${formatTo12Hour(endTime)}`;
+
+        if (newTimeSlot !== existingBooking.time_slot || dateForConflictCheck !== existingBooking.date) {
+            const [conflictingBookings] = await db.query(
+                'SELECT * FROM bookings WHERE court_id = ? AND date = ? AND id != ? AND status != ?',
+                [court_id, dateForConflictCheck, id, 'Cancelled']
+            );
+
+            const toMinutes = (timeStr) => {
+                const [time, modifier] = timeStr.split(' ');
+                let [hours, minutes] = time.split(':').map(Number);
+                if (modifier === 'PM' && hours < 12) hours += 12;
+                if (modifier === 'AM' && hours === 12) hours = 0;
+                return hours * 60 + minutes;
+            };
+
+            const checkOverlap = (startA, endA, startB, endB) => {
+                const startAMin = toMinutes(startA);
+                const endAMin = toMinutes(endA);
+                const startBMin = toMinutes(startB);
+                const endBMin = toMinutes(endB);
+                return startAMin < endBMin && endAMin > startBMin;
+            };
+
+            const isOverlapping = conflictingBookings.some(booking => {
+                const [existingStart, existingEnd] = booking.time_slot.split(' - ');
+                return checkOverlap(formatTo12Hour(startTime), formatTo12Hour(endTime), existingStart.trim(), existingEnd.trim());
+            });
+
+            if (isOverlapping) {
+                return res.status(409).json({ message: 'The selected time slot conflicts with another booking.' });
+            }
+        }
+
+        // 3. Recalculate price
+        const [sports] = await db.query('SELECT price FROM sports WHERE id = ?', [sport_id]);
+        const hourly_price = sports[0].price;
+
+        const parseTime = (timeStr) => {
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours * 60 + minutes;
+        };
+        const durationInMinutes = parseTime(endTime) - parseTime(startTime);
+        
+        let total_price = 0;
+        if (durationInMinutes > 0) {
+            const num_of_hours = Math.floor(durationInMinutes / 60);
+            const remaining_minutes = durationInMinutes % 60;
+            total_price = num_of_hours * hourly_price;
+            if (remaining_minutes >= 30) {
+                total_price += hourly_price / 2;
+            }
+        }
+
+        const balance_amount = total_price - amount_paid;
+
+        // 4. Update the booking
+        const sql = `
+            UPDATE bookings 
+            SET customer_name = ?, customer_contact = ?, customer_email = ?, date = ?, time_slot = ?, total_price = ?, amount_paid = ?, balance_amount = ?, payment_mode = ?, payment_status = ?, status = ?
+            WHERE id = ?
+        `;
+        const values = [
+            customer_name,
+            customer_contact,
+            customer_email,
+            dateForConflictCheck,
+            newTimeSlot,
+            total_price,
+            amount_paid,
+            balance_amount,
+            payment_mode,
+            payment_status,
+            status,
+            id
+        ];
+
+        await db.query(sql, values);
+
+        res.json({ success: true, message: 'Booking updated successfully' });
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -831,7 +1070,7 @@ router.post('/whatsapp', async (req, res) => {
 
             case 'select_date':
                 // Basic validation for date format
-                if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedMessage)) {
+                if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(trimmedMessage)) {
                     twiml.message('Invalid date format. Please use YYYY-MM-DD.');
                     break;
                 }
@@ -842,7 +1081,7 @@ router.post('/whatsapp', async (req, res) => {
 
             case 'select_time':
                 // Basic validation for time format
-                if (!/^\d{2}:\d{2}$/.test(trimmedMessage)) {
+                if (!/^\\d{2}:\\d{2}$/.test(trimmedMessage)) {
                     twiml.message('Invalid time format. Please use HH:MM (e.g., 09:00 or 15:00).');
                     break;
                 }
@@ -880,7 +1119,7 @@ router.post('/whatsapp', async (req, res) => {
                 break;
 
             case 'enter_phone':
-                if (!/^\d{10}$/.test(trimmedMessage)) {
+                if (!/^\\d{10}$/.test(trimmedMessage)) {
                     twiml.message('Invalid phone number. Please enter a 10-digit number.');
                     break;
                 }

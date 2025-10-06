@@ -31,7 +31,7 @@ const Analytics = () => {
     const [summary, setSummary] = useState({});
     const [bookingsOverTime, setBookingsOverTime] = useState({});
     const [revenueBySport, setRevenueBySport] = useState({});
-    const [utilizationData, setUtilizationData] = useState({});
+    const [dailyUtilization, setDailyUtilization] = useState({});
     const [bookingStatusData, setBookingStatusData] = useState({});
     const [courtPopularityData, setCourtPopularityData] = useState({});
     const [staffPerformanceData, setStaffPerformanceData] = useState({});
@@ -83,25 +83,34 @@ const Analytics = () => {
                     }]
                 });
 
-                // Court Utilization
+                // NEW: Daily Court Utilization Percentage
                 const utilizationRes = await api.get('/analytics/utilization-heatmap');
-                const hours = Array.from({ length: 17 }, (_, i) => i + 6); // 6 AM to 10 PM
+                const courtsRes = await api.get('/courts');
+                const totalCourts = courtsRes.data.length;
+                const operatingHours = 16; // Assuming 6 AM to 10 PM
+                const totalPossibleSlots = totalCourts * operatingHours;
+
                 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                const datasets = days.map((day, index) => {
+                const bookingsByDay = days.map(day => {
                     const dayData = utilizationRes.data.filter(d => d.day_of_week === day);
-                    return {
-                        label: day,
-                        data: hours.map(hour => {
-                            const hourData = dayData.find(d => d.hour_of_day === hour);
-                            return hourData ? hourData.booking_count : 0;
-                        }),
-                        backgroundColor: `rgba(${50 + index * 25}, ${180 - index * 15}, ${220 - index * 5}, 0.6)`
-                    };
+                    const totalBookings = dayData.reduce((sum, current) => sum + current.booking_count, 0);
+                    return totalBookings;
                 });
 
-                setUtilizationData({
-                    labels: hours.map(h => `${h % 12 === 0 ? 12 : h % 12}:00 ${h < 12 || h === 24 ? 'AM' : 'PM'}`),
-                    datasets: datasets
+                const utilizationPercentage = bookingsByDay.map(totalBookings => {
+                    if (totalPossibleSlots === 0) return 0;
+                    return (totalBookings / totalPossibleSlots) * 100;
+                });
+
+                setDailyUtilization({
+                    labels: days,
+                    datasets: [{
+                        label: 'Court Utilization (%)',
+                        data: utilizationPercentage,
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
                 });
 
                 // Booking Status Distribution
@@ -247,8 +256,24 @@ const Analytics = () => {
                 </div>
 
                 <div className="chart-card">
-                    <h3>Court Utilization by Day and Hour</h3>
-                    {utilizationData.labels && <Bar data={utilizationData} options={{ responsive: true, plugins: { title: { display: true, text: 'Hourly Bookings Throughout the Week' } }, scales: { x: { stacked: true }, y: { stacked: true } } }} />}
+                    <h3>Court Utilization by Day</h3>
+                    {dailyUtilization.labels && <Bar data={dailyUtilization} options={{ 
+                        responsive: true, 
+                        plugins: { 
+                            legend: { display: false }, 
+                            title: { display: true, text: 'Percentage of Court Time Booked Daily' } 
+                        },
+                        scales: {
+                            y: {
+                                max: 100,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%'
+                                    }
+                                }
+                            }
+                        }
+                    }} />}
                 </div>
             </div>
         </div>
