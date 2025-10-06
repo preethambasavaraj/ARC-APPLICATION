@@ -88,3 +88,8 @@ select * from bookings;
 select * from courts;
 
  DELETE FROM bookings WHERE id = 1;
+
+
+
+  ALTER TABLE bookings
+  MODIFY COLUMN payment_mode VARCHAR(50);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const BookingList = ({ bookings, onEdit, onCancel, onReceipt }) => {
+const BookingList = ({ bookings, onEdit, onCancel, onReceipt, isPaymentIdVisible }) => {
     const [activeDropdown, setActiveDropdown] = useState(null);
 
     const rowStyle = (booking) => {
@@ -39,7 +39,31 @@ const BookingList = ({ bookings, onEdit, onCancel, onReceipt }) => {
 
     return (
         <>
+            {/* Improved Styling */}
             <style>{`
+                .table-container {
+                    overflow-x: auto;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.9rem;
+                }
+                th, td {
+                    padding: 12px 15px;
+                    border: 1px solid #ddd;
+                    text-align: left;
+                    white-space: nowrap;
+                }
+                thead tr {
+                    background-color: #f4f4f4;
+                }
+                tbody tr:nth-of-type(even) {
+                    background-color: #f9f9f9;
+                }
+                tbody tr:hover {
+                    background-color: #f1f1f1;
+                }
                 .actions-cell {
                     position: relative;
                 }
@@ -86,6 +110,7 @@ const BookingList = ({ bookings, onEdit, onCancel, onReceipt }) => {
                             <th>Amount Paid</th>
                             <th>Balance</th>
                             <th>Payment Status</th>
+                            {isPaymentIdVisible && <th>Payment ID</th>}
                             <th>Booking Status</th>
                             <th>Actions</th>
                         </tr>
@@ -105,6 +130,7 @@ const BookingList = ({ bookings, onEdit, onCancel, onReceipt }) => {
                                     <td>{booking.amount_paid}</td>
                                     <td>{booking.balance_amount}</td>
                                     <td>{booking.payment_status}</td>
+                                    {isPaymentIdVisible && <td>{booking.payment_id || 'N/A'}</td>}
                                     <td>{booking.status}</td>
                                     <td className="actions-cell">
                                         <button onClick={() => toggleDropdown(booking.id)}>
