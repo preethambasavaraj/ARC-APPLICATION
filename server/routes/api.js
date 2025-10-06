@@ -511,7 +511,11 @@ router.post('/bookings/calculate-price', authenticateToken, async (req, res) => 
 
 // Add a new booking
 router.post('/bookings', authenticateToken, async (req, res) => {
-    const { court_id, customer_name, customer_contact, customer_email, date, startTime, endTime, payment_mode, amount_paid, slots_booked } = req.body;
+    const { court_id, customer_name, customer_contact, customer_email, date, startTime,             endTime,
+            payment_mode,
+            payment_id, // Added payment_id
+            amount_paid,
+            slots_booked } = req.body;
     const created_by_user_id = req.user.id; // Get user ID from JWT
 
     try {
@@ -604,10 +608,10 @@ router.post('/bookings', authenticateToken, async (req, res) => {
         };
 
         const time_slot = `${formatTo12Hour(startTime)} - ${formatTo12Hour(endTime)}`;
-        const sql = 'INSERT INTO bookings (court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid, total_price, balance_amount, payment_status, slots_booked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
-        const values = [court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, payment_mode, amount_paid, total_price, balance_amount, payment_status, slots_booked];
-
-        const [result] = await db.query(sql, values);
+        const [result] = await db.query(
+            'INSERT INTO bookings (court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, total_price, amount_paid, balance_amount, payment_status, payment_mode, payment_id, slots_booked, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [court_id, sport_id, created_by_user_id, customer_name, customer_contact, customer_email, date, time_slot, total_price, amount_paid, balance_amount, payment_status, payment_mode, payment_id, slots_booked, 'Booked']
+        );
         res.json({ success: true, bookingId: result.insertId });
     } catch (err) {
         res.status(500).json({ error: err.message });
