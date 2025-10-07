@@ -216,7 +216,8 @@ router.get('/bookings/all', authenticateToken, async (req, res) => {
                 s.name as sport_name,
                 b.total_price as total_amount,
                 u.username as created_by_user,
-                DATE_FORMAT(b.date, '%Y-%m-%d') as date
+                DATE_FORMAT(b.date, '%Y-%m-%d') as date,
+                b.is_rescheduled
             FROM bookings b 
             JOIN courts c ON b.court_id = c.id
             JOIN sports s ON b.sport_id = s.id
@@ -713,9 +714,11 @@ router.put('/bookings/:id', authenticateToken, async (req, res) => {
         const balance_amount = total_price - amount_paid;
 
         // 4. Update the booking
+        const is_rescheduled = newTimeSlot !== existingBooking.time_slot || dateForConflictCheck !== existingBooking.date;
+
         const sql = `
             UPDATE bookings 
-            SET customer_name = ?, customer_contact = ?, customer_email = ?, date = ?, time_slot = ?, total_price = ?, amount_paid = ?, balance_amount = ?, payment_mode = ?, payment_status = ?, status = ?
+            SET customer_name = ?, customer_contact = ?, customer_email = ?, date = ?, time_slot = ?, total_price = ?, amount_paid = ?, balance_amount = ?, payment_mode = ?, payment_status = ?, status = ?, is_rescheduled = ?
             WHERE id = ?
         `;
         const values = [
@@ -730,6 +733,7 @@ router.put('/bookings/:id', authenticateToken, async (req, res) => {
             payment_mode,
             payment_status,
             status,
+            is_rescheduled,
             id
         ];
 

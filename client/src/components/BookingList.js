@@ -4,10 +4,37 @@ const BookingList = ({ bookings, onEdit, onCancel, onReceipt, isPaymentIdVisible
     const [activeDropdown, setActiveDropdown] = useState(null);
 
     const rowStyle = (booking) => {
+        const now = new Date();
+        
+        // Default style
+        let style = {};
+
         if (booking.status === 'Cancelled') {
-            return { textDecoration: 'line-through', color: '#999' };
+            style.textDecoration = 'line-through';
+            style.color = '#999';
         }
-        return {};
+
+        if (booking.is_rescheduled) {
+            const [, endTimeStr] = booking.time_slot.split(' - ');
+            const [time, modifier] = endTimeStr.trim().split(' ');
+            let [hours, minutes] = time.split(':').map(Number);
+
+            if (modifier === 'PM' && hours < 12) {
+                hours += 12;
+            }
+            if (modifier === 'AM' && hours === 12) { // Handle midnight case
+                hours = 0;
+            }
+
+            const bookingEndDateTime = new Date(booking.date);
+            bookingEndDateTime.setHours(hours, minutes, 0, 0);
+
+            if (now < bookingEndDateTime) {
+                style.backgroundColor = '#d4edda'; // A light green color
+            }
+        }
+
+        return style;
     };
 
     const toggleDropdown = (bookingId) => {
